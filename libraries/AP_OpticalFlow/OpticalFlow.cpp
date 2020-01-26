@@ -83,13 +83,6 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_ADDR", 5,  OpticalFlow, _address,   0),
 
-    // the parameter description below is for GCSs (like MP) that use master for the parameter descriptions.  This should be removed when Copter-3.7 is released
-    // @Param: _ENABLE
-    // @DisplayName: Optical flow enable/disable
-    // @Description: Setting this to Enabled(1) will enable optical flow. Setting this to Disabled(0) will disable optical flow
-    // @Values: 0:Disabled, 1:Enabled
-    // @User: Standard
-
     AP_GROUPEND
 };
 
@@ -164,7 +157,7 @@ void OpticalFlow::update(void)
     _flags.healthy = (AP_HAL::millis() - _last_update_ms < 500);
 }
 
-void OpticalFlow::handle_msg(const mavlink_message_t *msg)
+void OpticalFlow::handle_msg(const mavlink_message_t &msg)
 {
     // exit immediately if not enabled
     if (!enabled()) {

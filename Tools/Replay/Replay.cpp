@@ -69,7 +69,7 @@ const AP_Param::Info ReplayVehicle::var_info[] = {
 
     // @Group: EK2_
     // @Path: ../libraries/AP_NavEKF2/AP_NavEKF2.cpp
-    GOBJECTN(EKF2, NavEKF2, "EK2_", NavEKF2),
+    GOBJECTN(ahrs.EKF2, NavEKF2, "EK2_", NavEKF2),
     
     // @Group: COMPASS_
     // @Path: ../libraries/AP_Compass/AP_Compass.cpp
@@ -81,7 +81,7 @@ const AP_Param::Info ReplayVehicle::var_info[] = {
     
     // @Group: EK3_
     // @Path: ../libraries/AP_NavEKF3/AP_NavEKF3.cpp
-    GOBJECTN(EKF3, NavEKF3, "EK3_", NavEKF3),
+    GOBJECTN(ahrs.EKF3, NavEKF3, "EK3_", NavEKF3),
 
     AP_VAREND
 };
@@ -119,8 +119,8 @@ void ReplayVehicle::setup(void)
     ahrs.set_correct_centrifugal(true);
     ahrs.set_ekf_use(true);
 
-    EKF2.set_enable(true);
-    EKF3.set_enable(true);
+    ahrs.EKF2.set_enable(true);
+    ahrs.EKF3.set_enable(true);
 
     printf("Starting disarmed\n");
     hal.util->set_soft_armed(false);
@@ -130,6 +130,10 @@ void ReplayVehicle::setup(void)
     barometer.update();
     compass.init();
     ins.set_hil_mode();
+}
+
+void ReplayVehicle::loop()
+{
 }
 
 Replay replay(replayvehicle);
@@ -331,8 +335,8 @@ void Replay::_parse_command_line(uint8_t argc, char * const argv[])
 class IMUCounter : public AP_LoggerFileReader {
 public:
     IMUCounter() {}
-    bool handle_log_format_msg(const struct log_Format &f);
-    bool handle_msg(const struct log_Format &f, uint8_t *msg);
+    bool handle_log_format_msg(const struct log_Format &f) override;
+    bool handle_msg(const struct log_Format &f, uint8_t *msg) override;
 
     uint64_t last_clock_timestamp = 0;
     float last_parm_value = 0;
@@ -616,13 +620,13 @@ void Replay::set_signal_handlers(void)
 void Replay::write_ekf_logs(void)
 {
     if (!LogReader::in_list("EKF", nottypes)) {
-        _vehicle.logger.Write_EKF(_vehicle.ahrs);
+        _vehicle.ahrs.Log_Write();
     }
     if (!LogReader::in_list("AHRS2", nottypes)) {
-        _vehicle.logger.Write_AHRS2(_vehicle.ahrs);
+        _vehicle.logger.Write_AHRS2();
     }
     if (!LogReader::in_list("POS", nottypes)) {
-        _vehicle.logger.Write_POS(_vehicle.ahrs);
+        _vehicle.logger.Write_POS();
     }
 }
 
@@ -644,7 +648,6 @@ void Replay::read_sensors(const char *type)
             if (!_vehicle.ahrs.set_home(loc)) {
                 ::printf("Failed to set home to that location!");
             }
-            _vehicle.compass.set_initial_location(loc.lat, loc.lng);
             done_home_init = true;
         }
     }
@@ -728,9 +731,9 @@ void Replay::log_check_generate(void)
     Vector3f velocity;
     Location loc {};
 
-    _vehicle.EKF2.getEulerAngles(-1,euler);
-    _vehicle.EKF2.getVelNED(-1,velocity);
-    _vehicle.EKF2.getLLH(loc);
+    _vehicle.ahrs.EKF2.getEulerAngles(-1,euler);
+    _vehicle.ahrs.EKF2.getVelNED(-1,velocity);
+    _vehicle.ahrs.EKF2.getLLH(loc);
 
     _vehicle.logger.Write(
         "CHEK",
@@ -762,9 +765,9 @@ void Replay::log_check_solution(void)
     Vector3f velocity;
     Location loc {};
 
-    _vehicle.EKF2.getEulerAngles(-1,euler);
-    _vehicle.EKF2.getVelNED(-1,velocity);
-    _vehicle.EKF2.getLLH(loc);
+    _vehicle.ahrs.EKF2.getEulerAngles(-1,euler);
+    _vehicle.ahrs.EKF2.getVelNED(-1,velocity);
+    _vehicle.ahrs.EKF2.getLLH(loc);
 
     float roll_error  = degrees(fabsf(euler.x - check_state.euler.x));
     float pitch_error = degrees(fabsf(euler.y - check_state.euler.y));
@@ -803,12 +806,12 @@ void Replay::show_packet_counts()
     for(uint16_t i=0;i<LOGREADER_MAX_FORMATS;i++) {
         if (counts[i] != 0) {
             logreader.format_type(i, format_type);
-            printf("%10ld %s\n", counts[i], format_type);
+            printf("%10" PRIu64 " %s\n", counts[i], format_type);
             total += counts[i];
         }
     }
 
-    printf("%ld total\n", total);
+    printf("%" PRIu64 " total\n", total);
 }
 
 void Replay::loop()
@@ -830,7 +833,7 @@ void Replay::loop()
     if (last_timestamp != 0) {
         uint64_t gap = AP_HAL::micros64() - last_timestamp;
         if (gap > 40000) {
-            ::printf("Gap in log at timestamp=%lu of length %luus\n",
+            ::printf("Gap in log at timestamp=%" PRIu64 " of length %" PRIu64 "us\n",
                      last_timestamp, gap);
         }
     }
@@ -958,18 +961,23 @@ bool Replay::check_user_param(const char *name)
     return false;
 }
 
-const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
+const struct AP_Param::GroupInfo        GCS_MAVLINK_Parameters::var_info[] = {
     AP_GROUPEND
 };
 GCS_Dummy _gcs;
 
-// dummy methods to avoid linking with these libraries
-AP_Camera *AP::camera() { return nullptr; }
-void AP_Camera::send_feedback(mavlink_channel_t) {}
-void AP_Camera::control(float, float, float, float, float, float) {}
-void AP_Camera::configure(float, float, float, float, float, float, float) {}
-bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reason) { return false; }
+#include <AP_ADSB/AP_ADSB.h>
+#include <AP_Avoidance/AP_Avoidance.h>
 
+// dummy methods to avoid linking with these libraries
+bool AP_AdvancedFailsafe::gcs_terminate(bool should_terminate, const char *reason) { return false; }
+AP_AdvancedFailsafe *AP::advancedfailsafe() { return nullptr; }
+
+// dummy method to avoid linking AP_Avoidance
+AP_Avoidance *AP::ap_avoidance() { return nullptr; }
+
+// avoid building/linking LTM:
+void AP_LTM_Telem::init() {};
 // avoid building/linking Devo:
 void AP_DEVO_Telem::init() {};
 

@@ -63,13 +63,18 @@
 // the var_info is a pointer, allowing for dynamic definition of the var_info tree
 #define AP_PARAM_FLAG_INFO_POINTER  (1<<4)
 
+// this parameter is visible to GCS via mavlink but should never be
+// set by anything other than the ArduPilot code responsible for its
+// use.
+#define AP_PARAM_FLAG_INTERNAL_USE_ONLY (1<<5)
+
 // keep all flags before the FRAME tags
 
 // vehicle and frame type flags, used to hide parameters when not
 // relevent to a vehicle type. Use AP_Param::set_frame_type_flags() to
 // enable parameters flagged in this way. frame type flags are stored
 // in flags field, shifted by AP_PARAM_FRAME_TYPE_SHIFT.
-#define AP_PARAM_FRAME_TYPE_SHIFT   5
+#define AP_PARAM_FRAME_TYPE_SHIFT   6
 
 // supported frame types for parameters
 #define AP_PARAM_FRAME_COPTER       (1<<0)
@@ -247,10 +252,11 @@ public:
     /// If the variable has no name, it cannot be found by this interface.
     ///
     /// @param  name            The full name of the variable to be found.
+    /// @param  flags           If non-null will be filled with parameter flags
     /// @return                 A pointer to the variable, or nullptr if
     ///                         it does not exist.
     ///
-    static AP_Param * find(const char *name, enum ap_var_type *ptype);
+    static AP_Param * find(const char *name, enum ap_var_type *ptype, uint16_t *flags = nullptr);
 
     /// set a default value by name
     ///
@@ -343,6 +349,12 @@ public:
     ///
     static bool load_all();
 
+    // returns storage space used:
+    static uint16_t storage_used() { return sentinal_offset; }
+
+    // returns storage space :
+    static uint16_t storage_size() { return _storage.size(); }
+
     /// reoad the hal.util defaults file. Called after pointer parameters have been allocated
     ///
     static void reload_defaults_file(bool last_pass);
@@ -377,6 +389,13 @@ public:
     // convert old vehicle parameters to new object parameters
     static void         convert_old_parameters(const struct ConversionInfo *conversion_table, uint8_t table_size, uint8_t flags=0);
 
+    /*
+      convert width of a parameter, allowing update to wider scalar
+      values without changing the parameter indexes. This will return
+      true if the parameter was converted from an old parameter value
+    */
+    bool convert_parameter_width(ap_var_type old_ptype);
+    
     // convert a single parameter with scaling
     enum {
         CONVERT_FLAG_REVERSE=1, // handle _REV -> _REVERSED conversion
@@ -414,14 +433,17 @@ public:
     static bool             check_var_info(void);
 
     // return true if the parameter is configured in the defaults file
-    bool configured_in_defaults_file(void) const;
+    bool configured_in_defaults_file(bool &read_only) const;
 
     // return true if the parameter is configured in EEPROM/FRAM
     bool configured_in_storage(void) const;
 
     // return true if the parameter is configured
-    bool configured(void) const { return configured_in_defaults_file() || configured_in_storage(); }
+    bool configured(void) const;
 
+    // return true if the parameter is read-only
+    bool is_read_only(void) const;
+    
     // count of parameters in tree
     static uint16_t count_parameters(void);
 
@@ -429,6 +451,7 @@ public:
 
     // set frame type flags. Used to unhide frame specific parameters
     static void set_frame_type_flags(uint16_t flags_to_set) {
+        _parameter_count = 0;
         _frame_type_flags |= flags_to_set;
     }
 
@@ -464,6 +487,8 @@ private:
         uint8_t spare;
     };
 
+    static uint16_t sentinal_offset;
+
 /* This header is prepended to a variable stored in EEPROM.
  *  The meaning is as follows:
  *
@@ -497,6 +522,7 @@ private:
     /*
       structure for built-in defaults file that can be modified using apj_tool.py
      */
+#if AP_PARAM_MAX_EMBEDDED_PARAM > 0
     struct PACKED param_defaults_struct {
         char magic_str[8];
         uint8_t param_magic[8];
@@ -505,6 +531,7 @@ private:
         volatile char data[AP_PARAM_MAX_EMBEDDED_PARAM];
     };
     static const param_defaults_struct param_defaults_data;
+#endif
 
 
     static bool                 check_group_info(const struct GroupInfo *group_info, uint16_t *total_size, 
@@ -585,7 +612,7 @@ private:
     // find a default value given a pointer to a default value in flash
     static float get_default_value(const AP_Param *object_ptr, const float *def_value_ptr);
 
-    static bool parse_param_line(char *line, char **vname, float &value);
+    static bool parse_param_line(char *line, char **vname, float &value, bool &read_only);
 
 #if HAL_OS_POSIX_IO == 1
     /*
@@ -616,9 +643,11 @@ private:
     struct param_override {
         const AP_Param *object_ptr;
         float value;
+        bool read_only; // param is marked @READONLY
     };
     static struct param_override *param_overrides;
     static uint16_t num_param_overrides;
+    static uint16_t num_read_only;
 
     // values filled into the EEPROM header
     static const uint8_t        k_EEPROM_magic0      = 0x50;

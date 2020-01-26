@@ -49,6 +49,15 @@ static Motor quad_bf_x_motors[] =
     Motor(AP_MOTORS_MOT_4,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CW, 4),
 };
 
+// motor order to match betaflight conventions, reversed direction
+static Motor quad_bf_x_rev_motors[] =
+{
+    Motor(AP_MOTORS_MOT_1,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 2),
+    Motor(AP_MOTORS_MOT_2,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  1),
+    Motor(AP_MOTORS_MOT_3, -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  3),
+    Motor(AP_MOTORS_MOT_4,  -45, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 4),
+};
+
 // motor order to match DJI conventions
 // See: https://forum44.djicdn.com/data/attachment/forum/201711/26/172348bppvtt1ot1nrtp5j.jpg
 static Motor quad_dji_x_motors[] =
@@ -190,6 +199,7 @@ static Frame supported_frames[] =
     Frame("quad",      4, quad_plus_motors),
     Frame("copter",    4, quad_plus_motors),
     Frame("x",         4, quad_x_motors),
+    Frame("bfxrev",    4, quad_bf_x_rev_motors),
     Frame("bfx",       4, quad_bf_x_motors),
     Frame("djix",      4, quad_dji_x_motors),
     Frame("cwx",       4, quad_cw_x_motors),
@@ -206,13 +216,13 @@ static Frame supported_frames[] =
     Frame("firefly",   6, firefly_motors)
 };
 
-void Frame::init(float _mass, float hover_throttle, float _terminal_velocity, float _terminal_rotation_rate)
+void Frame::init(float _mass, float _hover_throttle, float _terminal_velocity, float _terminal_rotation_rate)
 {
     /*
        scaling from total motor power to Newtons. Allows the copter
        to hover against gravity when each motor is at hover_throttle
     */
-    thrust_scale = (_mass * GRAVITY_MSS) / (num_motors * hover_throttle);
+    thrust_scale = (_mass * GRAVITY_MSS) / (num_motors * _hover_throttle);
 
     terminal_velocity = _terminal_velocity;
     terminal_rotation_rate = _terminal_rotation_rate;
@@ -228,6 +238,8 @@ Frame *Frame::find_frame(const char *name)
         if (strncasecmp(name, supported_frames[i].name, strlen(supported_frames[i].name)) == 0) {
             return &supported_frames[i];
         }
+
+
     }
     return nullptr;
 }
@@ -236,7 +248,8 @@ Frame *Frame::find_frame(const char *name)
 void Frame::calculate_forces(const Aircraft &aircraft,
                              const struct sitl_input &input,
                              Vector3f &rot_accel,
-                             Vector3f &body_accel)
+                             Vector3f &body_accel,
+                             float* rpm)
 {
     Vector3f thrust; // newtons
 
@@ -245,6 +258,10 @@ void Frame::calculate_forces(const Aircraft &aircraft,
         motors[i].calculate_forces(input, thrust_scale, motor_offset, mraccel, mthrust);
         rot_accel += mraccel;
         thrust += mthrust;
+        // simulate motor rpm
+        if (!is_zero(AP::sitl()->vibe_motor)) {
+            rpm[i] = sqrtf(mthrust.length() / thrust_scale) * AP::sitl()->vibe_motor * 60.0f;
+        }
     }
 
     body_accel = thrust/aircraft.gross_mass();
