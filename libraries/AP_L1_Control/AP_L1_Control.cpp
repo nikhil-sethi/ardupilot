@@ -64,7 +64,7 @@ float AP_L1_Control::get_yaw()
 /*
   Wrap AHRS yaw sensor if in reverse - centi-degress
  */
-int32_t AP_L1_Control::get_yaw_sensor() const
+float AP_L1_Control::get_yaw_sensor()
 {
     if (_reverse) {
         return wrap_180_cd(18000 + _ahrs.yaw_sensor);

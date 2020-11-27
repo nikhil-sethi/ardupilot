@@ -15,22 +15,35 @@
 
 #include "AP_OAVisGraph.h"
 
-// constructor initialises expanding array to use 20 elements per chunk
-AP_OAVisGraph::AP_OAVisGraph() :
-    _items(20)
+// constructor with size argument
+AP_OAVisGraph::AP_OAVisGraph(uint8_t size)
 {
+    init(size);
+}
+
+// initialise array to given size
+bool AP_OAVisGraph::init(uint8_t size)
+{
+    // only allow init once
+    if (_items != nullptr) {
+        return false;
+    }
+
+    // allocate array
+    _items = (VisGraphItem *)calloc(size, sizeof(VisGraphItem));
+    if (_items != nullptr) {
+        _num_items_max = size;
+        return true;
+    }
+
+    return false;
 }
 
 // add item to visiblity graph, returns true on success, false if graph is full
 bool AP_OAVisGraph::add_item(const OAItemID &id1, const OAItemID &id2, float distance_cm)
 {
-    // no more than 65k items
-    if (_num_items == UINT16_MAX) {
-        return false;
-    }
-
-    // ensure there is space in the array
-    if (!_items.expand_to_hold(_num_items+1)) {
+    // check there is space
+    if (_num_items >= _num_items_max) {
         return false;
     }
 

@@ -26,15 +26,13 @@ public:
     void process() override;
 
 private:
-    enum class Stage : uint8_t {
-        FORMATS = 0,
-        FIRMWARE_STRING,
-        GIT_VERSIONS,
-        SYSTEM_ID,
-        PARAM_SPACE_USED,
-        RC_PROTOCOL
+    enum write_sysinfo_blockwriter_stage : uint8_t {
+        ws_blockwriter_stage_formats = 0,
+        ws_blockwriter_stage_firmware_string,
+        ws_blockwriter_stage_git_versions,
+        ws_blockwriter_stage_system_id
     };
-    Stage stage;
+    write_sysinfo_blockwriter_stage stage;
 };
 
 class LoggerMessageWriter_WriteEntireMission : public LoggerMessageWriter {
@@ -44,14 +42,14 @@ public:
     void process() override;
 
 private:
-    enum Stage {
-        WRITE_NEW_MISSION_MESSAGE = 0,
-        WRITE_MISSION_ITEMS,
-        DONE
+    enum entire_mission_blockwriter_stage {
+        em_blockwriter_stage_write_new_mission_message = 0,
+        em_blockwriter_stage_write_mission_items,
+        em_blockwriter_stage_done
     };
 
     uint16_t _mission_number_to_send;
-    Stage stage;
+    entire_mission_blockwriter_stage stage;
 };
 
 class LoggerMessageWriter_WriteAllRallyPoints : public LoggerMessageWriter {
@@ -61,14 +59,14 @@ public:
     void process() override;
 
 private:
-    enum Stage {
-        WRITE_NEW_RALLY_MESSAGE = 0,
-        WRITE_ALL_RALLY_POINTS,
-        DONE
+    enum all_rally_points_blockwriter_stage {
+        ar_blockwriter_stage_write_new_rally_message = 0,
+        ar_blockwriter_stage_write_all_rally_points,
+        ar_blockwriter_stage_done
     };
 
     uint16_t _rally_number_to_send;
-    Stage stage = Stage::WRITE_NEW_RALLY_MESSAGE;
+    all_rally_points_blockwriter_stage stage;
 };
 
 class LoggerMessageWriter_DFLogStart : public LoggerMessageWriter {
@@ -93,22 +91,22 @@ public:
 
 private:
 
-    enum Stage {
-        FORMATS = 0,
-        UNITS,
-        MULTIPLIERS,
-        FORMAT_UNITS,
-        PARMS,
-        SYSINFO,
-        WRITE_ENTIRE_MISSION,
-        WRITE_ALL_RALLY_POINTS,
-        VEHICLE_MESSAGES,
-        DONE,
+    enum log_start_blockwriter_stage {
+        ls_blockwriter_stage_formats = 0,
+        ls_blockwriter_stage_units,
+        ls_blockwriter_stage_multipliers,
+        ls_blockwriter_stage_format_units,
+        ls_blockwriter_stage_parms,
+        ls_blockwriter_stage_sysinfo,
+        ls_blockwriter_stage_write_entire_mission,
+        ls_blockwriter_stage_write_all_rally_points,
+        ls_blockwriter_stage_vehicle_messages,
+        ls_blockwriter_stage_done,
     };
 
     bool _fmt_done;
 
-    Stage stage;
+    log_start_blockwriter_stage stage;
 
     uint16_t next_format_to_send;
 

@@ -65,7 +65,6 @@ void ModeStabilize_Heli::run()
         if (!motors->limit.throttle_lower) {
             set_land_complete(false);
         }
-        break;
     case AP_Motors::SpoolState::SPOOLING_UP:
     case AP_Motors::SpoolState::SPOOLING_DOWN:
         // do nothing

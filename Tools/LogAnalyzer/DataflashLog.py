@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 import collections
+import os
 import numpy
 import bisect
 import sys

@@ -40,12 +40,12 @@ bool AP_Logger::should_handle_log_message()
 /**
    handle all types of log download requests from the GCS
  */
-void AP_Logger::handle_log_message(GCS_MAVLINK &link, const mavlink_message_t &msg)
+void AP_Logger::handle_log_message(GCS_MAVLINK &link, mavlink_message_t *msg)
 {
     if (!should_handle_log_message()) {
         return;
     }
-    switch (msg.msgid) {
+    switch (msg->msgid) {
     case MAVLINK_MSG_ID_LOG_REQUEST_LIST:
         handle_log_request_list(link, msg);
         break;
@@ -64,7 +64,7 @@ void AP_Logger::handle_log_message(GCS_MAVLINK &link, const mavlink_message_t &m
 /**
    handle all types of log download requests from the GCS
  */
-void AP_Logger::handle_log_request_list(GCS_MAVLINK &link, const mavlink_message_t &msg)
+void AP_Logger::handle_log_request_list(GCS_MAVLINK &link, mavlink_message_t *msg)
 {
     WITH_SEMAPHORE(_log_send_sem);
 
@@ -74,11 +74,9 @@ void AP_Logger::handle_log_request_list(GCS_MAVLINK &link, const mavlink_message
     }
 
     mavlink_log_request_list_t packet;
-    mavlink_msg_log_request_list_decode(&msg, &packet);
+    mavlink_msg_log_request_list_decode(msg, &packet);
 
     _log_num_logs = get_num_logs();
-    uint16_t last_log = find_last_log();
-
     if (_log_num_logs == 0) {
         _log_next_list_entry = 0;
         _log_last_list_entry = 0;        
@@ -86,15 +84,15 @@ void AP_Logger::handle_log_request_list(GCS_MAVLINK &link, const mavlink_message
         _log_next_list_entry = packet.start;
         _log_last_list_entry = packet.end;
 
-        if (_log_last_list_entry > last_log) {
-            _log_last_list_entry = last_log;
+        if (_log_last_list_entry > _log_num_logs) {
+            _log_last_list_entry = _log_num_logs;
         }
         if (_log_next_list_entry < 1) {
-            _log_next_list_entry = last_log - _log_num_logs + 1;
+            _log_next_list_entry = 1;
         }
     }
 
-    transfer_activity = TransferActivity::LISTING;
+    transfer_activity = LISTING;
     _log_sending_link = &link;
 
     handle_log_send_listing();
@@ -104,7 +102,7 @@ void AP_Logger::handle_log_request_list(GCS_MAVLINK &link, const mavlink_message
 /**
    handle request for log data
  */
-void AP_Logger::handle_log_request_data(GCS_MAVLINK &link, const mavlink_message_t &msg)
+void AP_Logger::handle_log_request_data(GCS_MAVLINK &link, mavlink_message_t *msg)
 {
     WITH_SEMAPHORE(_log_send_sem);
 
@@ -120,16 +118,15 @@ void AP_Logger::handle_log_request_data(GCS_MAVLINK &link, const mavlink_message
     }
 
     mavlink_log_request_data_t packet;
-    mavlink_msg_log_request_data_decode(&msg, &packet);
+    mavlink_msg_log_request_data_decode(msg, &packet);
 
     // consider opening or switching logs:
-    if (transfer_activity != TransferActivity::SENDING || _log_num_data != packet.id) {
+    if (transfer_activity != SENDING || _log_num_data != packet.id) {
 
         uint16_t num_logs = get_num_logs();
-        uint16_t last_log = find_last_log();
-        if (packet.id > last_log || packet.id < (last_log - num_logs + 1)) {
+        if (packet.id > num_logs || packet.id < 1) {
             // request for an invalid log; cancel any current download
-            transfer_activity = TransferActivity::IDLE;
+            transfer_activity = IDLE;
             return;
         }
 
@@ -152,7 +149,7 @@ void AP_Logger::handle_log_request_data(GCS_MAVLINK &link, const mavlink_message
         _log_data_remaining = packet.count;
     }
 
-    transfer_activity = TransferActivity::SENDING;
+    transfer_activity = SENDING;
     _log_sending_link = &link;
 
     handle_log_send();
@@ -161,10 +158,10 @@ void AP_Logger::handle_log_request_data(GCS_MAVLINK &link, const mavlink_message
 /**
    handle request to erase log data
  */
-void AP_Logger::handle_log_request_erase(GCS_MAVLINK &link, const mavlink_message_t &msg)
+void AP_Logger::handle_log_request_erase(GCS_MAVLINK &link, mavlink_message_t *msg)
 {
     // mavlink_log_erase_t packet;
-    // mavlink_msg_log_erase_decode(&msg, &packet);
+    // mavlink_msg_log_erase_decode(msg, &packet);
 
     EraseAll();
 }
@@ -172,13 +169,13 @@ void AP_Logger::handle_log_request_erase(GCS_MAVLINK &link, const mavlink_messag
 /**
    handle request to stop transfer and resume normal logging
  */
-void AP_Logger::handle_log_request_end(GCS_MAVLINK &link, const mavlink_message_t &msg)
+void AP_Logger::handle_log_request_end(GCS_MAVLINK &link, mavlink_message_t *msg)
 {
     WITH_SEMAPHORE(_log_send_sem);
     mavlink_log_request_end_t packet;
-    mavlink_msg_log_request_end_decode(&msg, &packet);
+    mavlink_msg_log_request_end_decode(msg, &packet);
 
-    transfer_activity = TransferActivity::IDLE;
+    transfer_activity = IDLE;
     _log_sending_link = nullptr;
 }
 
@@ -197,12 +194,12 @@ void AP_Logger::handle_log_send()
         return;
     }
     switch (transfer_activity) {
-    case TransferActivity::IDLE:
+    case IDLE:
         break;
-    case TransferActivity::LISTING:
+    case LISTING:
         handle_log_send_listing();
         break;
-    case TransferActivity::SENDING:
+    case SENDING:
         handle_log_sending();
         break;
     }
@@ -230,7 +227,7 @@ void AP_Logger::handle_log_sending()
 #endif
 
     for (uint8_t i=0; i<num_sends; i++) {
-        if (transfer_activity != TransferActivity::SENDING) {
+        if (transfer_activity != SENDING) {
             // may have completed sending data
             break;
         }
@@ -270,7 +267,7 @@ void AP_Logger::handle_log_send_listing()
                                time_utc,
                                size);
     if (_log_next_list_entry == _log_last_list_entry) {
-        transfer_activity = TransferActivity::IDLE;
+        transfer_activity = IDLE;
         _log_sending_link = nullptr;
     } else {
         _log_next_list_entry++;
@@ -322,7 +319,7 @@ bool AP_Logger::handle_log_send_data()
     _log_data_offset += len;
     _log_data_remaining -= len;
     if (ret < MAVLINK_MSG_LOG_DATA_FIELD_DATA_LEN || _log_data_remaining == 0) {
-        transfer_activity = TransferActivity::IDLE;
+        transfer_activity = IDLE;
         _log_sending_link = nullptr;
     }
     return true;

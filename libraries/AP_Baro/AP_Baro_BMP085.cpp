@@ -335,7 +335,6 @@ bool AP_Baro_BMP085::_data_ready()
         break;
     case BMP085_OVERSAMPLING_ULTRAHIGHRES:
         conversion_time_msec = 26;
-        break;
     default:
         break;
     }

@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
+ * 
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #include "RCInput.h"
@@ -36,17 +36,15 @@ using namespace ChibiOS;
 extern const AP_HAL::HAL& hal;
 void RCInput::init()
 {
-#ifndef HAL_BUILD_AP_PERIPH
-    AP::RC().init();
-#endif
-
 #if HAL_USE_ICU == TRUE
     //attach timer channel on which the signal will be received
     sig_reader.attach_capture_timer(&RCIN_ICU_TIMER, RCIN_ICU_CHANNEL, STM32_RCIN_DMA_STREAM, STM32_RCIN_DMA_CHANNEL);
+    rcin_prot.init();
 #endif
 
 #if HAL_USE_EICU == TRUE
     sig_reader.init(&RCININT_EICU_TIMER, RCININT_EICU_CHANNEL);
+    rcin_prot.init();
 #endif
 
     _init = true;
@@ -73,7 +71,7 @@ bool RCInput::new_input()
             radio->init();
         }
     }
-#endif
+#endif    
     return valid;
 }
 
@@ -90,7 +88,7 @@ uint16_t RCInput::read(uint8_t channel)
     if (!_init || (channel >= MIN(RC_INPUT_MAX_CHANNELS, _num_channels))) {
         return 0;
     }
-    rcin_mutex.take_blocking();
+    rcin_mutex.take(HAL_SEMAPHORE_BLOCK_FOREVER);
     uint16_t v = _rc_values[channel];
     rcin_mutex.give();
 #if HAL_RCINPUT_WITH_AP_RADIO
@@ -107,7 +105,7 @@ uint8_t RCInput::read(uint16_t* periods, uint8_t len)
     if (!_init) {
         return false;
     }
-
+ 
     if (len > RC_INPUT_MAX_CHANNELS) {
         len = RC_INPUT_MAX_CHANNELS;
     }
@@ -123,16 +121,11 @@ void RCInput::_timer_tick(void)
         return;
     }
 
-#ifndef HAL_NO_UARTDRIVER
-    const char *rc_protocol = nullptr;
-#endif
-
-#ifndef HAL_BUILD_AP_PERIPH
 #if HAL_USE_ICU == TRUE
     const uint32_t *p;
     uint32_t n;
     while ((p = (const uint32_t *)sig_reader.sigbuf.readptr(n)) != nullptr) {
-        AP::RC().process_pulse_list(p, n*2, sig_reader.need_swap);
+        rcin_prot.process_pulse_list(p, n*2, sig_reader.need_swap);
         sig_reader.sigbuf.advance(n);
     }
 #endif
@@ -140,30 +133,34 @@ void RCInput::_timer_tick(void)
 #if HAL_USE_EICU == TRUE
     uint32_t width_s0, width_s1;
     while(sig_reader.read(width_s0, width_s1)) {
-        AP::RC().process_pulse(width_s0, width_s1);
+        rcin_prot.process_pulse(width_s0, width_s1);
     }
 #endif
 
-    if (AP::RC().new_input()) {
-        rcin_mutex.take_blocking();
+#ifndef HAL_NO_UARTDRIVER
+    const char *rc_protocol = nullptr;
+#endif
+
+#if HAL_USE_ICU == TRUE || HAL_USE_EICU == TRUE
+    if (rcin_prot.new_input()) {
+        rcin_mutex.take(HAL_SEMAPHORE_BLOCK_FOREVER);
         _rcin_timestamp_last_signal = AP_HAL::micros();
-        _num_channels = AP::RC().num_channels();
+        _num_channels = rcin_prot.num_channels();
         _num_channels = MIN(_num_channels, RC_INPUT_MAX_CHANNELS);
         for (uint8_t i=0; i<_num_channels; i++) {
-            _rc_values[i] = AP::RC().read(i);
+            _rc_values[i] = rcin_prot.read(i);
         }
-        _rssi = AP::RC().get_RSSI();
         rcin_mutex.give();
 #ifndef HAL_NO_UARTDRIVER
-        rc_protocol = AP::RC().protocol_name();
+        rc_protocol = rcin_prot.protocol_name();
 #endif
     }
-#endif // HAL_BUILD_AP_PERIPH
+#endif
 
 #if HAL_RCINPUT_WITH_AP_RADIO
     if (radio && radio->last_recv_us() != last_radio_us) {
         last_radio_us = radio->last_recv_us();
-        rcin_mutex.take_blocking();
+        rcin_mutex.take(HAL_SEMAPHORE_BLOCK_FOREVER);
         _rcin_timestamp_last_signal = last_radio_us;
         _num_channels = radio->num_channels();
         _num_channels = MIN(_num_channels, RC_INPUT_MAX_CHANNELS);
@@ -175,13 +172,12 @@ void RCInput::_timer_tick(void)
 #endif
 
 #if HAL_WITH_IO_MCU
-    rcin_mutex.take_blocking();
+    rcin_mutex.take(HAL_SEMAPHORE_BLOCK_FOREVER);
     if (AP_BoardConfig::io_enabled() &&
         iomcu.check_rcinput(last_iomcu_us, _num_channels, _rc_values, RC_INPUT_MAX_CHANNELS)) {
         _rcin_timestamp_last_signal = last_iomcu_us;
 #ifndef HAL_NO_UARTDRIVER
         rc_protocol = iomcu.get_rc_protocol();
-        _rssi = iomcu.get_RSSI();
 #endif
     }
     rcin_mutex.give();
@@ -204,18 +200,18 @@ void RCInput::_timer_tick(void)
 bool RCInput::rc_bind(int dsmMode)
 {
 #if HAL_WITH_IO_MCU
-    rcin_mutex.take_blocking();
+    rcin_mutex.take(HAL_SEMAPHORE_BLOCK_FOREVER);
     if (AP_BoardConfig::io_enabled()) {
         iomcu.bind_dsm(dsmMode);
     }
     rcin_mutex.give();
 #endif
 
-#ifndef HAL_BUILD_AP_PERIPH
+#if HAL_USE_ICU == TRUE
     // ask AP_RCProtocol to start a bind
-    AP::RC().start_bind();
+    rcin_prot.start_bind();
 #endif
-
+    
 #if HAL_RCINPUT_WITH_AP_RADIO
     if (radio) {
         radio->start_recv_bind();

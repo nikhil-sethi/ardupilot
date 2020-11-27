@@ -64,11 +64,11 @@ void UARTDriver::begin(uint32_t baud, uint16_t rxSpace, uint16_t txSpace)
     if (strcmp(path, "GPS1") == 0) {
         /* gps */
         _connected = true;
-        _fd = _sitlState->gps_pipe(0);
+        _fd = _sitlState->gps_pipe();
     } else if (strcmp(path, "GPS2") == 0) {
         /* 2nd gps */
         _connected = true;
-        _fd = _sitlState->gps_pipe(1);
+        _fd = _sitlState->gps2_pipe();
     } else {
         /* parse type:args:flags string for path. 
            For example:
@@ -104,11 +104,10 @@ void UARTDriver::begin(uint32_t baud, uint16_t rxSpace, uint16_t txSpace)
             _uart_baudrate = baudrate;
             _uart_start_connection();
         } else if (strcmp(devtype, "sim") == 0) {
+            ::printf("SIM connection %s:%s on port %u\n", args1, args2, _portNumber);
             if (!_connected) {
-                ::printf("SIM connection %s:%s on port %u\n", args1, args2, _portNumber);
                 _connected = true;
                 _fd = _sitlState->sim_fd(args1, args2);
-                _fd_write = _sitlState->sim_fd_write(args1);
             }
         } else if (strcmp(devtype, "udpclient") == 0) {
             // udp client connection
@@ -178,19 +177,15 @@ void UARTDriver::flush(void)
 {
 }
 
-// size_t UARTDriver::write(uint8_t c)
-// {
-//     if (txspace() <= 0) {
-//         return 0;
-//     }
-//     _writebuffer.write(&c, 1);
-//     return 1;
-// }
-
 size_t UARTDriver::write(uint8_t c)
 {
-    return write(&c, 1);
+    if (txspace() <= 0) {
+        return 0;
+    }
+    _writebuffer.write(&c, 1);
+    return 1;
 }
+
 size_t UARTDriver::write(const uint8_t *buffer, size_t size)
 {
     if (txspace() <= size) {
@@ -201,16 +196,8 @@ size_t UARTDriver::write(const uint8_t *buffer, size_t size)
     }
     if (_unbuffered_writes) {
         // write buffer straight to the file descriptor
-        int fd = _fd_write;
-        if (fd == -1) {
-            fd = _fd;
-        }
-        const ssize_t nwritten = ::write(fd, buffer, size);
+        const ssize_t nwritten = ::write(_fd, buffer, size);
         if (nwritten == -1 && errno != EAGAIN && _uart_path) {
-            if (_fd_write != -1) {
-                close(_fd_write);
-                _fd_write = -1;
-            }
             close(_fd);
             _fd = -1;
             _connected = false;
@@ -302,7 +289,7 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
         }
 
         fprintf(stderr, "Serial port %u on TCP port %u\n", _portNumber,
-                (unsigned)ntohs(sockaddr.sin_port));
+                _sitlState->base_port() + _portNumber);
         fflush(stdout);
     }
 
@@ -318,7 +305,7 @@ void UARTDriver::_tcp_start_connection(uint16_t port, bool wait_for_connection)
         setsockopt(_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
         fcntl(_fd, F_SETFD, FD_CLOEXEC);
         _connected = true;
-        fprintf(stdout, "Connection on serial port %u\n", (unsigned)ntohs(sockaddr.sin_port));
+        fprintf(stdout, "Connection on serial port %u\n", _portNumber);
     }
 }
 
@@ -663,16 +650,8 @@ void UARTDriver::_timer_tick(void)
         if (readptr && navail > 0) {
             navail = MIN(navail, max_bytes);
             if (!_use_send_recv) {
-                int fd = _fd_write;
-                if (fd == -1) {
-                    fd = _fd;
-                }
-                nwritten = ::write(fd, readptr, navail);
+                nwritten = ::write(_fd, readptr, navail);
                 if (nwritten == -1 && errno != EAGAIN && _uart_path) {
-                    if (_fd_write != -1){
-                        close(_fd_write);
-                        _fd_write = -1;
-                    }
                     close(_fd);
                     _fd = -1;
                     _connected = false;

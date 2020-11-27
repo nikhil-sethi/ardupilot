@@ -103,7 +103,7 @@ Location::AltFrame Location::get_alt_frame() const
 bool Location::get_alt_cm(AltFrame desired_frame, int32_t &ret_alt_cm) const
 {
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    if (!initialised()) {
+    if (lat == 0 && lng == 0) {
         AP_HAL::panic("Should not be called on invalid location");
     }
 #endif
@@ -245,10 +245,13 @@ Vector3f Location::get_distance_NED(const Location &loc2) const
 // extrapolate latitude/longitude given distances (in meters) north and east
 void Location::offset(float ofs_north, float ofs_east)
 {
-    const int32_t dlat = ofs_north * LOCATION_SCALING_FACTOR_INV;
-    const int32_t dlng = (ofs_east * LOCATION_SCALING_FACTOR_INV) / longitude_scale();
-    lat += dlat;
-    lng += dlng;
+    // use is_equal() because is_zero() is a local class conflict and is_zero() in AP_Math does not belong to a class
+    if (!is_equal(ofs_north, 0.0f) || !is_equal(ofs_east, 0.0f)) {
+        int32_t dlat = ofs_north * LOCATION_SCALING_FACTOR_INV;
+        int32_t dlng = (ofs_east * LOCATION_SCALING_FACTOR_INV) / longitude_scale();
+        lat += dlat;
+        lng += dlng;
+    }
 }
 
 /*
@@ -268,7 +271,7 @@ void Location::offset_bearing(float bearing, float distance)
 float Location::longitude_scale() const
 {
     float scale = cosf(lat * (1.0e-7f * DEG_TO_RAD));
-    return MAX(scale, 0.01f);
+    return constrain_float(scale, 0.01f, 1.0f);
 }
 
 /*

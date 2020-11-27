@@ -22,7 +22,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <SRV_Channel/SRV_Channel.h>
 #include <AP_Common/Location.h>
-#include <AP_AHRS/AP_AHRS.h>
 
 // table of user settable parameters for deepstall
 const AP_Param::GroupInfo AP_Landing_Deepstall::var_info[] = {
@@ -339,7 +338,7 @@ bool AP_Landing_Deepstall::override_servos(void)
 
     // use the current airspeed to dictate the travel limits
     float airspeed;
-    if (!landing.ahrs.airspeed_estimate(airspeed)) {
+    if (!landing.ahrs.airspeed_estimate(&airspeed)) {
         airspeed = 0; // safely forces control to the deepstall steering since we don't have an estimate
     }
 
@@ -449,7 +448,7 @@ void AP_Landing_Deepstall::Log(void) const {
                              constrain_float(predicted_travel_distance * 1e2f, (float)INT16_MIN, (float)INT16_MAX) : 0),
         l1_i             : stage >= DEEPSTALL_STAGE_LAND ? L1_xtrack_i : 0.0f,
         loiter_sum_cd    : stage >= DEEPSTALL_STAGE_ESTIMATE_WIND ? loiter_sum_cd : 0,
-        desired          : pid_info.target,
+        desired          : pid_info.desired,
         P                : pid_info.P,
         I                : pid_info.I,
         D                : pid_info.D,

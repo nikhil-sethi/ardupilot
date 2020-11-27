@@ -68,7 +68,9 @@ AP_Compass_MMC3416::AP_Compass_MMC3416(AP_HAL::OwnPtr<AP_HAL::Device> _dev,
 
 bool AP_Compass_MMC3416::init()
 {
-    dev->get_semaphore()->take_blocking();
+    if (!dev->get_semaphore()->take(0)) {
+        return false;
+    }
 
     dev->set_retries(10);
     

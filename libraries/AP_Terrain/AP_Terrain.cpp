@@ -20,11 +20,18 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Logger/AP_Logger.h>
 #include "AP_Terrain.h"
-#include <AP_AHRS/AP_AHRS.h>
 
 #if AP_TERRAIN_AVAILABLE
 
-#include <AP_Filesystem/AP_Filesystem.h>
+#include <assert.h>
+#include <stdio.h>
+#if HAL_OS_POSIX_IO
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif
+#include <sys/types.h>
+#include <errno.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -296,7 +303,6 @@ float AP_Terrain::lookahead(float bearing, float distance, float climb_ratio)
  */
 void AP_Terrain::update(void)
 {
-    if (!enable) { return; }
     // just schedule any needed disk IO
     schedule_disk_io();
 
@@ -377,7 +383,7 @@ void AP_Terrain::log_terrain_data()
  */
 bool AP_Terrain::allocate(void)
 {
-    if (enable == 0 || memory_alloc_failed) {
+    if (enable == 0) {
         return false;
     }
     if (cache != nullptr) {
@@ -385,8 +391,8 @@ bool AP_Terrain::allocate(void)
     }
     cache = (struct grid_cache *)calloc(TERRAIN_GRID_BLOCK_CACHE_SIZE, sizeof(cache[0]));
     if (cache == nullptr) {
+        enable.set(0);
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Terrain: Allocation failed");
-        memory_alloc_failed = true;
         return false;
     }
     cache_size = TERRAIN_GRID_BLOCK_CACHE_SIZE;

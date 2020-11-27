@@ -22,6 +22,7 @@ public:
     void update();
     void calculate_fw_crc(void);
 
+private:
     void pwm_out_update();
     void heater_update();
     void rcin_update();
@@ -43,7 +44,7 @@ public:
     int16_t mix_elevon_vtail(int16_t angle1, int16_t angle2, bool first_output) const;
     void dsm_bind_step(void);
 
-    struct {
+    struct PACKED {
         /* default to RSSI ADC functionality */
         uint16_t features;
         uint16_t arming;
@@ -77,7 +78,6 @@ public:
 
     // PAGE_RAW_RCIN values
     struct page_rc_input rc_input;
-    uint32_t rc_last_input_ms;
 
     // PAGE_SERVO values
     struct {
@@ -98,7 +98,7 @@ public:
     struct {
         uint16_t pwm[IOMCU_MAX_CHANNELS];
     } reg_safety_pwm;
-
+    
     // output rates
     struct {
         uint16_t freq;
@@ -112,10 +112,12 @@ public:
 
     // true when override channel active
     bool override_active;
-
+    
     // sbus rate handling
     uint32_t sbus_last_ms;
     uint32_t sbus_interval_ms;
+
+    AP_RCProtocol *rcprotocol;
 
     uint32_t fmu_data_received_time;
     uint32_t last_heater_ms;
@@ -124,7 +126,7 @@ public:
     bool update_default_rate;
     bool update_rcout_freq;
     bool has_heater;
-    const bool heater_pwm_polarity = IOMCU_IMU_HEATER_POLARITY;
+    bool heater_pwm_polarity;
     uint32_t last_blue_led_ms;
     uint32_t safety_update_ms;
     uint32_t safety_button_counter;
@@ -148,3 +150,4 @@ public:
 #define AMBER_SET(on) palWriteLine(HAL_GPIO_PIN_AMBER_LED, !(on));
 #define SPEKTRUM_POWER(on) palWriteLine(HAL_GPIO_PIN_SPEKTRUM_PWR_EN, on);
 #define SPEKTRUM_SET(on) palWriteLine(HAL_GPIO_PIN_SPEKTRUM_OUT, on);
+

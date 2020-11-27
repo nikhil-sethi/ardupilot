@@ -40,9 +40,6 @@ const AP_Scheduler::Task Sub::scheduler_tasks[] = {
     SCHED_TASK(one_hz_loop,            1,    100),
     SCHED_TASK_CLASS(GCS,                 (GCS*)&sub._gcs,   update_receive,     400, 180),
     SCHED_TASK_CLASS(GCS,                 (GCS*)&sub._gcs,   update_send,        400, 550),
-#if AC_FENCE == ENABLED
-    SCHED_TASK_CLASS(AC_Fence,            &sub.fence,        update,              10, 100),
-#endif
 #if MOUNT == ENABLED
     SCHED_TASK_CLASS(AP_Mount,            &sub.camera_mount, update,              50,  75),
 #endif
@@ -106,8 +103,7 @@ void Sub::fast_loop()
     // update INS immediately to get current gyro data populated
     ins.update();
 
-    //don't run rate controller in manual or motordetection modes
-    if (control_mode != MANUAL && control_mode != MOTOR_DETECT) {
+    if (control_mode != MANUAL) { //don't run rate controller in manual mode
         // run low level rate controllers that only require IMU data
         attitude_control.rate_controller_run();
     }
@@ -268,7 +264,7 @@ void Sub::one_hz_loop()
     AP_Notify::flags.flying = motors.armed();
 
     if (should_log(MASK_LOG_ANY)) {
-        Log_Write_Data(LogDataID::AP_STATE, ap.value);
+        Log_Write_Data(DATA_AP_STATE, ap.value);
     }
 
     if (!motors.armed()) {
@@ -288,9 +284,12 @@ void Sub::one_hz_loop()
     // log terrain data
     terrain_logging();
 
+    // init compass location for declination
+    init_compass_location();
+
     // need to set "likely flying" when armed to allow for compass
     // learning to run
-    set_likely_flying(hal.util->get_soft_armed());
+    ahrs.set_likely_flying(hal.util->get_soft_armed());
 }
 
 // called at 50hz

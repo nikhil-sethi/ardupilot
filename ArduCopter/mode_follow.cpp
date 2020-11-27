@@ -24,12 +24,6 @@ bool ModeFollow::init(const bool ignore_checks)
     return ModeGuided::init(ignore_checks);
 }
 
-// perform cleanup required when leaving follow mode
-void ModeFollow::exit()
-{
-    g2.follow.clear_offsets_if_required();
-}
-
 void ModeFollow::run()
 {
     // if not armed set throttle to zero and exit immediately

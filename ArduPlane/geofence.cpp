@@ -21,27 +21,32 @@
  *  very quickly at runtime
  */
 static struct GeofenceState {
-    Vector2l *boundary;   // point 0 is the return point
-    uint32_t breach_time;
-    int32_t guided_lat;
-    int32_t guided_lng;
-    uint16_t breach_count;
-    uint8_t breach_type;
-    uint8_t old_switch_position;
     uint8_t num_points;
     bool boundary_uptodate;
     bool fence_triggered;
     bool is_pwm_enabled;          //true if above FENCE_ENABLE_PWM threshold
+    bool previous_is_pwm_enabled; //true if above FENCE_ENALBE_PWM threshold
+                                  // last time we checked
     bool is_enabled;
+    GeofenceEnableReason enable_reason;
     bool floor_enabled;          //typically used for landing
+    uint16_t breach_count;
+    uint8_t breach_type;
+    uint32_t breach_time;
+    uint8_t old_switch_position;
+    int32_t guided_lat;
+    int32_t guided_lng;
+    /* point 0 is the return point */
+    Vector2l *boundary;
 } *geofence_state;
+
 
 static const StorageAccess fence_storage(StorageManager::StorageFence);
 
 /*
   maximum number of fencepoints
  */
-uint8_t Plane::max_fencepoints(void) const
+uint8_t Plane::max_fencepoints(void)
 {
     return MIN(255U, fence_storage.size() / sizeof(Vector2l));
 }
@@ -49,15 +54,19 @@ uint8_t Plane::max_fencepoints(void) const
 /*
  *  fence boundaries fetch/store
  */
-Vector2l Plane::get_fence_point_with_index(uint8_t i) const
+Vector2l Plane::get_fence_point_with_index(unsigned i)
 {
-    if (i > (uint8_t)g.fence_total || i >= max_fencepoints()) {
+    Vector2l ret;
+
+    if (i > (unsigned)g.fence_total || i >= max_fencepoints()) {
         return Vector2l(0,0);
     }
 
     // read fence point
-    return Vector2l(fence_storage.read_uint32(i * sizeof(Vector2l)),
-                    fence_storage.read_uint32(i * sizeof(Vector2l) + sizeof(int32_t)));
+    ret.x = fence_storage.read_uint32(i * sizeof(Vector2l));
+    ret.y = fence_storage.read_uint32(i * sizeof(Vector2l) + sizeof(int32_t));
+
+    return ret;
 }
 
 // save a fence point
@@ -81,6 +90,8 @@ void Plane::set_fence_point_with_index(const Vector2l &point, unsigned i)
  */
 void Plane::geofence_load(void)
 {
+    uint8_t i;
+
     if (geofence_state == nullptr) {
         uint16_t boundary_size = sizeof(Vector2l) * max_fencepoints();
         if (hal.util->available_memory() < 100 + boundary_size + sizeof(struct GeofenceState)) {
@@ -111,10 +122,10 @@ void Plane::geofence_load(void)
         return;
     }
 
-    for (uint8_t i = 0; i<g.fence_total; i++) {
+    for (i=0; i<g.fence_total; i++) {
         geofence_state->boundary[i] = get_fence_point_with_index(i);
     }
-    geofence_state->num_points = g.fence_total;
+    geofence_state->num_points = i;
 
     if (!Polygon_complete(&geofence_state->boundary[1], geofence_state->num_points-1)) {
         geofence_disable_and_send_error_msg("pt[1] and pt[total-1] must match");
@@ -160,11 +171,6 @@ bool Plane::geofence_present(void)
  */
 void Plane::geofence_update_pwm_enabled_state() 
 {
-    if (rc_failsafe_active()) {
-        // do nothing based on the radio channel value as it may be at bind value
-        return;
-    }
-
     bool is_pwm_enabled;
     if (g.fence_channel == 0) {
         is_pwm_enabled = false;
@@ -182,14 +188,16 @@ void Plane::geofence_update_pwm_enabled_state()
         return;
     }
 
-    if (geofence_state->is_pwm_enabled != is_pwm_enabled) {
-        geofence_set_enabled(is_pwm_enabled);
-        geofence_state->is_pwm_enabled = is_pwm_enabled;
+    geofence_state->previous_is_pwm_enabled = geofence_state->is_pwm_enabled;
+    geofence_state->is_pwm_enabled = is_pwm_enabled;
+
+    if (geofence_state->is_pwm_enabled != geofence_state->previous_is_pwm_enabled) {
+        geofence_set_enabled(geofence_state->is_pwm_enabled, PWM_TOGGLED);
     }    
 }
 
 //return true on success, false on failure
-bool Plane::geofence_set_enabled(bool enable) 
+bool Plane::geofence_set_enabled(bool enable, GeofenceEnableReason r) 
 {
     if (geofence_state == nullptr && enable) {
         geofence_load();
@@ -203,6 +211,7 @@ bool Plane::geofence_set_enabled(bool enable)
         //turn the floor back on if it had been off
         geofence_set_floor_enabled(true);
     }
+    geofence_state->enable_reason = r;
     
     return true;
 }
@@ -212,20 +221,14 @@ bool Plane::geofence_set_enabled(bool enable)
  */
 bool Plane::geofence_enabled(void)
 {
-    if (g.fence_action == FENCE_ACTION_NONE) {
-        if (geofence_state != nullptr) {
-            geofence_state->fence_triggered = false;
-        }
-        return false;
-    }
-
     geofence_update_pwm_enabled_state();
 
     if (geofence_state == nullptr) {
         return false;
     }
 
-    if (!geofence_present() ||
+    if (g.fence_action == FENCE_ACTION_NONE ||
+        !geofence_present() ||
         (g.fence_action != FENCE_ACTION_REPORT && !geofence_state->is_enabled)) {
         // geo-fencing is disabled
         // re-arm for when the channel trigger is switched on
@@ -341,7 +344,7 @@ void Plane::geofence_check(bool altitude_check_only)
             guided_WP_loc.lat == geofence_state->guided_lat &&
             guided_WP_loc.lng == geofence_state->guided_lng) {
             geofence_state->old_switch_position = 254;
-            set_mode(*previous_mode, ModeReason::GCS_COMMAND);
+            set_mode(*previous_mode, MODE_REASON_GCS_COMMAND);
         }
         return;
     }
@@ -429,9 +432,9 @@ void Plane::geofence_check(bool altitude_check_only)
         int8_t saved_auto_trim = g.auto_trim;
         g.auto_trim.set(0);
         if (g.fence_action == FENCE_ACTION_RTL) {
-            set_mode(mode_rtl, ModeReason::FENCE_BREACHED);
+            set_mode(mode_rtl, MODE_REASON_FENCE_BREACH);
         } else {
-            set_mode(mode_guided, ModeReason::FENCE_BREACHED);
+            set_mode(mode_guided, MODE_REASON_FENCE_BREACH);
         }
         g.auto_trim.set(saved_auto_trim);
 
@@ -527,7 +530,7 @@ bool Plane::geofence_present(void) {
     return false;
 }
 
-bool Plane::geofence_set_enabled(bool enable) {
+bool Plane::geofence_set_enabled(bool enable, GeofenceEnableReason r) {
     return false;
 }
 

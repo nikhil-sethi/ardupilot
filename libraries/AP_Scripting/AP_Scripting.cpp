@@ -25,20 +25,12 @@
 #define SCRIPTING_STACK_MIN_SIZE (8 * 1024)
 
 #if !defined(SCRIPTING_STACK_SIZE)
-  #define SCRIPTING_STACK_SIZE (17 * 1024) // Linux experiences stack corruption at ~16.25KB when handed bad scripts
+  #define SCRIPTING_STACK_SIZE (16 * 1024)
 #endif // !defined(SCRIPTING_STACK_SIZE)
 
 #if !defined(SCRIPTING_STACK_MAX_SIZE)
   #define SCRIPTING_STACK_MAX_SIZE (64 * 1024)
 #endif // !defined(SCRIPTING_STACK_MAX_SIZE)
-
-#if !defined(SCRIPTING_HEAP_SIZE)
-  #if CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX
-    #define SCRIPTING_HEAP_SIZE (64 * 1024)
-  #else
-    #define SCRIPTING_HEAP_SIZE (43 * 1024)
-  #endif
-#endif // !defined(SCRIPTING_HEAP_SIZE)
 
 static_assert(SCRIPTING_STACK_SIZE >= SCRIPTING_STACK_MIN_SIZE, "Scripting requires a larger minimum stack size");
 static_assert(SCRIPTING_STACK_SIZE <= SCRIPTING_STACK_MAX_SIZE, "Scripting requires a smaller stack size");
@@ -52,7 +44,7 @@ const AP_Param::GroupInfo AP_Scripting::var_info[] = {
     // @Values: 0:None,1:Lua Scripts
     // @RebootRequired: True
     // @User: Advanced
-    AP_GROUPINFO_FLAGS("ENABLE", 1, AP_Scripting, _enable, 0, AP_PARAM_FLAG_ENABLE),
+    AP_GROUPINFO_FLAGS("ENABLE", 1, AP_Scripting, _enable, 1, AP_PARAM_FLAG_ENABLE),
 
     // @Param: VM_I_COUNT
     // @DisplayName: Scripting Virtual Machine Instruction Count
@@ -69,7 +61,7 @@ const AP_Param::GroupInfo AP_Scripting::var_info[] = {
     // @Increment: 1024
     // @User: Advanced
     // @RebootRequired: True
-    AP_GROUPINFO("HEAP_SIZE", 3, AP_Scripting, _script_heap_size, SCRIPTING_HEAP_SIZE),
+    AP_GROUPINFO("HEAP_SIZE", 3, AP_Scripting, _script_heap_size, 32*1024),
 
     AP_GROUPINFO("DEBUG_LVL", 4, AP_Scripting, _debug_level, 1),
 
@@ -87,30 +79,30 @@ AP_Scripting::AP_Scripting() {
     _singleton = this;
 }
 
-void AP_Scripting::init(void) {
+bool AP_Scripting::init(void) {
     if (!_enable) {
-        return;
+        return true;
     }
 
     if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_Scripting::thread, void),
                                       "Scripting", SCRIPTING_STACK_SIZE, AP_HAL::Scheduler::PRIORITY_SCRIPTING, 0)) {
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Could not create scripting stack (%d)", SCRIPTING_STACK_SIZE);
-        gcs().send_text(MAV_SEVERITY_ERROR, "Scripting failed to start");
-        _init_failed = true;
+        return false;
     }
+
+    return true;
 }
 
 void AP_Scripting::thread(void) {
     lua_scripts *lua = new lua_scripts(_script_vm_exec_count, _script_heap_size, _debug_level);
-    if (lua == nullptr || !lua->heap_allocated()) {
+    if (lua == nullptr) {
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Unable to allocate scripting memory");
-        _init_failed = true;
         return;
     }
     lua->run();
 
     // only reachable if the lua backend has died for any reason
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "Scripting has stopped");
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "Scripting has died");
 }
 
 AP_Scripting *AP_Scripting::_singleton = nullptr;

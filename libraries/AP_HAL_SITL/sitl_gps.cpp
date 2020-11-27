@@ -33,15 +33,15 @@
 using namespace HALSITL;
 extern const AP_HAL::HAL& hal;
 
+static uint8_t next_gps_index;
+static uint8_t gps_delay;
+
 // state of GPS emulation
 static struct gps_state {
     /* pipe emulating UBLOX GPS serial stream */
     int gps_fd, client_fd;
     uint32_t last_update; // milliseconds
-
-    uint8_t next_index;
-    uint8_t delay;
-} gps_state[2];
+} gps_state, gps2_state;
 
 /*
   hook for reading from the GPS pipe
@@ -65,21 +65,39 @@ ssize_t SITL_State::gps_read(int fd, void *buf, size_t count)
 /*
   setup GPS input pipe
  */
-int SITL_State::gps_pipe(uint8_t idx)
+int SITL_State::gps_pipe(void)
 {
     int fd[2];
-    if (gps_state[idx].client_fd != 0) {
-        return gps_state[idx].client_fd;
+    if (gps_state.client_fd != 0) {
+        return gps_state.client_fd;
     }
     pipe(fd);
-    gps_state[idx].gps_fd    = fd[1];
-    gps_state[idx].client_fd = fd[0];
-    gps_state[idx].last_update = AP_HAL::millis();
+    gps_state.gps_fd    = fd[1];
+    gps_state.client_fd = fd[0];
+    gps_state.last_update = AP_HAL::millis();
     fcntl(fd[0], F_SETFD, FD_CLOEXEC);
     fcntl(fd[1], F_SETFD, FD_CLOEXEC);
-    HALSITL::UARTDriver::_set_nonblocking(gps_state[idx].gps_fd);
+    HALSITL::UARTDriver::_set_nonblocking(gps_state.gps_fd);
     HALSITL::UARTDriver::_set_nonblocking(fd[0]);
-    return gps_state[idx].client_fd;
+    return gps_state.client_fd;
+}
+
+/*
+  setup GPS2 input pipe
+ */
+int SITL_State::gps2_pipe(void)
+{
+    int fd[2];
+    if (gps2_state.client_fd != 0) {
+        return gps2_state.client_fd;
+    }
+    pipe(fd);
+    gps2_state.gps_fd    = fd[1];
+    gps2_state.client_fd = fd[0];
+    gps2_state.last_update = AP_HAL::millis();
+    HALSITL::UARTDriver::_set_nonblocking(gps2_state.gps_fd);
+    HALSITL::UARTDriver::_set_nonblocking(fd[0]);
+    return gps2_state.client_fd;
 }
 
 /*
@@ -87,9 +105,6 @@ int SITL_State::gps_pipe(uint8_t idx)
  */
 void SITL_State::_gps_write(const uint8_t *p, uint16_t size, uint8_t instance)
 {
-    if (instance == 1 && !_sitl->gps2_enable) {
-        return;
-    }
     while (size--) {
         if (_sitl->gps_byteloss > 0.0f) {
             float r = ((((unsigned)random()) % 1000000)) / 1.0e4;
@@ -99,8 +114,13 @@ void SITL_State::_gps_write(const uint8_t *p, uint16_t size, uint8_t instance)
                 continue;
             }
         }
-        if (gps_state[instance].gps_fd != 0) {
-            write(gps_state[instance].gps_fd, p, 1);
+        if (instance == 0 && gps_state.gps_fd != 0) {
+            write(gps_state.gps_fd, p, 1);
+        }
+        if (instance == 1 && _sitl->gps2_enable) {
+            if (gps2_state.gps_fd != 0) {
+                write(gps2_state.gps_fd, p, 1);
+            }
         }
         p++;
     }
@@ -655,20 +675,10 @@ void SITL_State::_update_gps_nmea(const struct gps_data *d, uint8_t instance)
                      2.0,
                      d->altitude);
     float speed_knots = norm(d->speedN, d->speedE) * M_PER_SEC_TO_KNOTS;
-
     float heading = ToDeg(atan2f(d->speedE, d->speedN));
     if (heading < 0) {
         heading += 360.0f;
     }
-
-    //$GPVTG,133.18,T,120.79,M,0.11,N,0.20,K,A*24    
-    _gps_nmea_printf(instance, "$GPVTG,%.2f,T,%.2f,M,%.2f,N,%.2f,K,A",
-                     tstring,
-                     heading,
-                     heading,
-                     speed_knots,
-                     speed_knots * KNOTS_TO_METERS_PER_SECOND * 3.6);
-    
     _gps_nmea_printf(instance, "$GPRMC,%s,%c,%s,%s,%.2f,%.2f,%s,,",
                      tstring,
                      d->have_lock?'A':'V',
@@ -677,10 +687,6 @@ void SITL_State::_update_gps_nmea(const struct gps_data *d, uint8_t instance)
                      speed_knots,
                      heading,
                      dstring);
-
-    if (_sitl->gps_hdg_enabled) {
-        _gps_nmea_printf(instance, "$GPHDT,%.2f,T", d->yaw);
-    }
 }
 
 void SITL_State::_sbp_send_message(uint16_t msg_type, uint16_t sender_id, uint8_t len, uint8_t *payload, uint8_t instance)
@@ -1145,9 +1151,9 @@ void SITL_State::_update_gps_file(uint8_t instance)
   possibly send a new GPS packet
  */
 void SITL_State::_update_gps(double latitude, double longitude, float altitude,
-                             double speedN, double speedE, double speedD,
-                             double yaw, bool have_lock)
+                             double speedN, double speedE, double speedD, bool have_lock)
 {
+    struct gps_data d;
     char c;
 
     // simulate delayed lock times
@@ -1171,107 +1177,109 @@ void SITL_State::_update_gps(double latitude, double longitude, float altitude,
         }
     }
 
-    for (uint8_t idx=0; idx<2; idx++) {
-        struct gps_data d;
+    // run at configured GPS rate (default 5Hz)
+    if ((AP_HAL::millis() - gps_state.last_update) < (uint32_t)(1000/_sitl->gps_hertz)) {
+        return;
+    }
 
-        if (idx == 1 && !_sitl->gps2_enable) {
-            continue;
+    // swallow any config bytes
+    if (gps_state.gps_fd != 0) {
+        read(gps_state.gps_fd, &c, 1);
+    }
+    if (gps2_state.gps_fd != 0) {
+        read(gps2_state.gps_fd, &c, 1);
+    }
+
+    gps_state.last_update = AP_HAL::millis();
+    gps2_state.last_update = AP_HAL::millis();
+
+    d.latitude = latitude;
+    d.longitude = longitude;
+    // add an altitude error controlled by a slow sine wave
+    d.altitude = altitude + _sitl->gps_noise * sinf(AP_HAL::millis() * 0.0005f);
+
+    // Add offet to c.g. velocity to get velocity at antenna
+    d.speedN = speedN;
+    d.speedE = speedE;
+    d.speedD = speedD;
+    d.have_lock = have_lock;
+
+    // correct the latitude, longitude, hiehgt and NED velocity for the offset between
+    // the vehicle c.g. and GPs antenna
+    Vector3f posRelOffsetBF = _sitl->gps_pos_offset;
+    if (!posRelOffsetBF.is_zero()) {
+        // get a rotation matrix following DCM conventions (body to earth)
+        Matrix3f rotmat;
+        _sitl->state.quaternion.rotation_matrix(rotmat);
+
+        // rotate the antenna offset into the earth frame
+        Vector3f posRelOffsetEF = rotmat * posRelOffsetBF;
+
+        // Add the offset to the latitude, longitude and height using a spherical earth approximation
+        double const earth_rad_inv = 1.569612305760477e-7; // use Authalic/Volumetric radius
+        double lng_scale_factor = earth_rad_inv / cos(radians(d.latitude));
+        d.latitude += degrees(posRelOffsetEF.x * earth_rad_inv);
+        d.longitude += degrees(posRelOffsetEF.y * lng_scale_factor);
+        d.altitude -= posRelOffsetEF.z;
+
+        // calculate a velocity offset due to the antenna position offset and body rotation rate
+        // note: % operator is overloaded for cross product
+        Vector3f gyro(radians(_sitl->state.rollRate),
+             radians(_sitl->state.pitchRate),
+             radians(_sitl->state.yawRate));
+        Vector3f velRelOffsetBF = gyro % posRelOffsetBF;
+
+        // rotate the velocity offset into earth frame and add to the c.g. velocity
+        Vector3f velRelOffsetEF = rotmat * velRelOffsetBF;
+        d.speedN += velRelOffsetEF.x;
+        d.speedE += velRelOffsetEF.y;
+        d.speedD += velRelOffsetEF.z;
+    }
+
+    if (_sitl->gps_drift_alt > 0) {
+        // slow altitude drift
+        d.altitude += _sitl->gps_drift_alt*sinf(AP_HAL::millis()*0.001f*0.02f);
+    }
+
+    // add in some GPS lag
+    _gps_data[next_gps_index++] = d;
+    if (next_gps_index >= gps_delay+1) {
+        next_gps_index = 0;
+    }
+
+    d = _gps_data[next_gps_index];
+
+    if (_sitl->gps_delay != gps_delay) {
+        // cope with updates to the delay control
+        gps_delay = _sitl->gps_delay;
+        for (uint8_t i=0; i<gps_delay; i++) {
+            _gps_data[i] = d;
         }
+    }
 
-        // run at configured GPS rate (default 5Hz)
-        if ((AP_HAL::millis() - gps_state[idx].last_update) < (uint32_t)(1000/_sitl->gps_hertz)) {
-            continue;
-        }
+    if (gps_state.gps_fd == 0 && gps2_state.gps_fd == 0) {
+        return;
+    }
+    // Creating GPS2 data by coping GPS data
+    gps_data d2 = d;
 
-        // swallow any config bytes
-        if (gps_state[idx].gps_fd != 0) {
-            read(gps_state[idx].gps_fd, &c, 1);
-        }
+    // Applying GPS glitch
+    // Using first gps glitch
+    Vector3f glitch_offsets = _sitl->gps_glitch;
+    d.latitude += glitch_offsets.x;
+    d.longitude += glitch_offsets.y;
+    d.altitude += glitch_offsets.z;
+    // Using second gps glitch
+    glitch_offsets = _sitl->gps2_glitch;
+    d2.latitude += glitch_offsets.x;
+    d2.longitude += glitch_offsets.y;
+    d2.altitude += glitch_offsets.z;
 
-        gps_state[idx].last_update = AP_HAL::millis();
-
-        d.latitude = latitude;
-        d.longitude = longitude;
-        d.yaw = yaw;
-    
-        // add an altitude error controlled by a slow sine wave
-        d.altitude = altitude + _sitl->gps_noise * sinf(AP_HAL::millis() * 0.0005f);
-
-        // Add offet to c.g. velocity to get velocity at antenna
-        d.speedN = speedN;
-        d.speedE = speedE;
-        d.speedD = speedD;
-        d.have_lock = have_lock;
-
-        if (_sitl->gps_drift_alt > 0) {
-            // slow altitude drift
-            d.altitude += _sitl->gps_drift_alt*sinf(AP_HAL::millis()*0.001f*0.02f);
-        }
-
-        // correct the latitude, longitude, hiehgt and NED velocity for the offset between
-        // the vehicle c.g. and GPs antenna
-        Vector3f posRelOffsetBF = _sitl->gps_pos_offset[idx];
-        if (!posRelOffsetBF.is_zero()) {
-            // get a rotation matrix following DCM conventions (body to earth)
-            Matrix3f rotmat;
-            _sitl->state.quaternion.rotation_matrix(rotmat);
-
-            // rotate the antenna offset into the earth frame
-            Vector3f posRelOffsetEF = rotmat * posRelOffsetBF;
-
-            // Add the offset to the latitude, longitude and height using a spherical earth approximation
-            double const earth_rad_inv = 1.569612305760477e-7; // use Authalic/Volumetric radius
-            double lng_scale_factor = earth_rad_inv / cos(radians(d.latitude));
-            d.latitude += degrees(posRelOffsetEF.x * earth_rad_inv);
-            d.longitude += degrees(posRelOffsetEF.y * lng_scale_factor);
-            d.altitude -= posRelOffsetEF.z;
-
-            // calculate a velocity offset due to the antenna position offset and body rotation rate
-            // note: % operator is overloaded for cross product
-            Vector3f gyro(radians(_sitl->state.rollRate),
-                          radians(_sitl->state.pitchRate),
-                          radians(_sitl->state.yawRate));
-            Vector3f velRelOffsetBF = gyro % posRelOffsetBF;
-
-            // rotate the velocity offset into earth frame and add to the c.g. velocity
-            Vector3f velRelOffsetEF = rotmat * velRelOffsetBF;
-            d.speedN += velRelOffsetEF.x;
-            d.speedE += velRelOffsetEF.y;
-            d.speedD += velRelOffsetEF.z;
-        }
-
-        // add in some GPS lag
-        uint8_t &next_index = gps_state[idx].next_index;
-        uint8_t &delay = gps_state[idx].delay;
-        _gps_data[idx][next_index++] = d;
-        if (next_index >= delay+1) {
-            next_index = 0;
-        }
-
-        d = _gps_data[idx][next_index];
-
-        if (_sitl->gps_delay != delay) {
-            // cope with updates to the delay control
-            delay = _sitl->gps_delay;
-            for (uint8_t i=0; i<delay; i++) {
-                _gps_data[idx][i] = d;
-            }
-        }
-
-        if (gps_state[idx].gps_fd == 0) {
-            continue;
-        }
-
-        // Applying GPS glitch
-        // Using first gps glitch
-        Vector3f glitch_offsets = _sitl->gps_glitch[idx];
-        d.latitude += glitch_offsets.x;
-        d.longitude += glitch_offsets.y;
-        d.altitude += glitch_offsets.z;
-
-        if (gps_state[idx].gps_fd != 0) {
-            _update_gps_instance((SITL::SITL::GPSType)_sitl->gps_type[idx].get(), &d, idx);
-        }
+    if (gps_state.gps_fd != 0) {
+        _update_gps_instance((SITL::SITL::GPSType)_sitl->gps_type.get(), &d, 0);
+    }
+    if (gps2_state.gps_fd != 0) {
+        _update_gps_instance((SITL::SITL::GPSType)_sitl->gps2_type.get(), &d2, 1);
     }
 }
 

@@ -71,7 +71,7 @@ void ModeAcro_Heli::run()
         // convert the input to the desired body frame rate
         get_pilot_desired_angle_rates(channel_roll->get_control_in(), channel_pitch->get_control_in(), channel_yaw->get_control_in(), target_roll, target_pitch, target_yaw);
         // only mimic flybar response when trainer mode is disabled
-        if ((Trainer)g.acro_trainer.get() == Trainer::OFF) {
+        if (g.acro_trainer == ACRO_TRAINER_DISABLED) {
             // while landed always leak off target attitude to current attitude
             if (copter.ap.land_complete) {
                 virtual_flybar(target_roll, target_pitch, target_yaw, 3.0f, 3.0f);

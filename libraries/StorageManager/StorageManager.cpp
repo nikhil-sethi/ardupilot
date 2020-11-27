@@ -1,5 +1,5 @@
 /*
-   Please contribute your ideas! See https://dev.ardupilot.org for details
+   Please contribute your ideas! See http://dev.ardupilot.org for details
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "StorageManager.h"
-#include <stdio.h>
 
 
 extern const AP_HAL::HAL& hal;
@@ -31,15 +30,6 @@ extern const AP_HAL::HAL& hal;
   compatibility with older firmwares
  */
 
-#if STORAGE_NUM_AREAS == 1
-/*
-  layout for peripherals
- */
-const StorageManager::StorageArea StorageManager::layout_default[STORAGE_NUM_AREAS] = {
-    { StorageParam,   0,     HAL_STORAGE_SIZE}
-};
-
-#else
 /*
   layout for fixed wing and rovers
   On PX4v1 this gives 309 waypoints, 30 rally points and 52 fence points
@@ -66,10 +56,10 @@ const StorageManager::StorageArea StorageManager::layout_default[STORAGE_NUM_ARE
     { StorageParam,    8192,  1280},
     { StorageRally,    9472,   300},
     { StorageFence,    9772,   256},
-    { StorageMission,  10028,  5204}, // leave 128 byte gap for expansion
-    { StorageCANDNA,   15232,  1024},
+    { StorageMission, 10028,  6228}, // leave 128 byte gap for expansion
 #endif
 };
+
 
 /*
   layout for copter.
@@ -97,11 +87,9 @@ const StorageManager::StorageArea StorageManager::layout_copter[STORAGE_NUM_AREA
     { StorageParam,    8192,  1280},
     { StorageRally,    9472,   300},
     { StorageFence,    9772,   256},
-    { StorageMission,  10028,  5204}, // leave 128 byte gap for expansion
-    { StorageCANDNA,   15232,  1024},
+    { StorageMission, 10028,  6228}, // leave 128 byte gap for expansion
 #endif
 };
-#endif // STORAGE_NUM_AREAS == 1
 
 // setup default layout
 const StorageManager::StorageArea *StorageManager::layout = layout_default;
@@ -111,9 +99,21 @@ const StorageManager::StorageArea *StorageManager::layout = layout_default;
  */
 void StorageManager::erase(void)
 {
-    if (!hal.storage->erase()) {
-        ::printf("StorageManager: erase failed\n");
+    uint8_t blk[16];
+    memset(blk, 0, sizeof(blk));
+    for (uint8_t i=0; i<STORAGE_NUM_AREAS; i++) {
+        const StorageManager::StorageArea &area = StorageManager::layout[i];
+        uint16_t length = area.length;
+        uint16_t offset = area.offset;
+        for (uint16_t ofs=0; ofs<length; ofs += sizeof(blk)) {
+            uint8_t n = 16;
+            if (ofs + n > length) {
+                n = length - ofs;
+            }
+            hal.storage->write_block(offset + ofs, blk, n);
+        }
     }
+    
 }
 
 /*

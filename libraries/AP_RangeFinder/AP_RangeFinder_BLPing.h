@@ -1,21 +1,28 @@
 #pragma once
 
-#include "AP_RangeFinder.h"
-#include "AP_RangeFinder_Backend_Serial.h"
+#include "RangeFinder.h"
+#include "RangeFinder_Backend.h"
 
-class AP_RangeFinder_BLPing : public AP_RangeFinder_Backend_Serial
+class AP_RangeFinder_BLPing : public AP_RangeFinder_Backend
 {
 
 public:
 
-    using AP_RangeFinder_Backend_Serial::AP_RangeFinder_Backend_Serial;
+    // constructor
+    AP_RangeFinder_BLPing(RangeFinder::RangeFinder_State &_state,
+                          AP_RangeFinder_Params &_params,
+                          AP_SerialManager &serial_manager,
+                          uint8_t serial_instance);
+
+    // static detection function
+    static bool detect(AP_SerialManager &serial_manager, uint8_t serial_instance);
 
     // update state
     void update(void) override;
 
 protected:
 
-    MAV_DISTANCE_SENSOR _get_mav_distance_sensor_type() const override {
+    virtual MAV_DISTANCE_SENSOR _get_mav_distance_sensor_type() const override {
         return MAV_DISTANCE_SENSOR_ULTRASOUND;
     }
 
@@ -27,9 +34,7 @@ private:
     void send_message(uint16_t msgid, const uint8_t *payload, uint16_t payload_len);
 
     // read a distance from the sensor
-    bool get_reading(uint16_t &reading_cm) override;
-
-    uint16_t read_timeout_ms() const override { return 500; }
+    bool get_reading(uint16_t &reading_cm);
 
     // process one byte received on serial port
     // returns true if a distance message has been successfully parsed
@@ -50,6 +55,7 @@ private:
         CRC_H
     };
 
+    AP_HAL::UARTDriver *uart;
     uint32_t last_init_ms;      // system time that sensor was last initialised
     uint16_t distance_cm;       // latest distance
 

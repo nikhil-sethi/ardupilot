@@ -28,7 +28,6 @@ bool ModeSmartRTL::_enter()
 
     // init state
     smart_rtl_state = SmartRTL_WaitForPathCleanup;
-    _loitering = false;
 
     return true;
 }
@@ -76,20 +75,12 @@ void ModeSmartRTL::update()
         case SmartRTL_StopAtHome:
         case SmartRTL_Failure:
             _reached_destination = true;
-            // we have reached the destination
-            // boats loiters, rovers stop
-            if (!rover.is_boat()) {
-               stop_vehicle();
+            if (rover.is_boat()) {
+                // boats attempt to hold position at home
+                navigate_to_waypoint();
             } else {
-                // if not loitering yet, start loitering
-                if (!_loitering) {
-                    _loitering = rover.mode_loiter.enter();
-                }
-                if (_loitering) {
-                    rover.mode_loiter.update();
-                } else {
-                    stop_vehicle();
-               }
+                // rovers stop
+                stop_vehicle();
             }
             break;
     }
@@ -113,16 +104,6 @@ bool ModeSmartRTL::get_desired_location(Location& destination) const
     }
     // should never reach here but just in case
     return false;
-}
-
-// set desired speed in m/s
-bool ModeSmartRTL::set_desired_speed(float speed)
-{
-    if (is_negative(speed)) {
-        return false;
-    }
-    g2.wp_nav.set_desired_speed(speed);
-    return true;
 }
 
 // save current position for use by the smart_rtl flight mode

@@ -26,8 +26,7 @@ public:
         Protocol_Type_None = 0,
         Protocol_Type_UAVCAN = 1,
         Protocol_Type_KDECAN = 2,
-        Protocol_Type_ToshibaCAN = 3,
-        Protocol_Type_PiccoloCAN = 4,
+        Protocol_Type_ToshibaCAN = 3
     };
 
     void init(void);
@@ -88,8 +87,8 @@ public:
     }
 
     static const struct AP_Param::GroupInfo var_info[];
-#if AP_UAVCAN_SLCAN_ENABLED
-    AP_HAL::UARTDriver *get_slcan_serial();
+#if !HAL_MINIMIZE_FEATURES
+    int8_t get_slcan_serial() { return _slcan._ser_port; }
     uint8_t get_slcan_timeout() { return _slcan._timeout; }
     void reset_slcan_serial() { _slcan._ser_port.set_and_save_ifchanged(-1); }
 #endif
@@ -127,13 +126,12 @@ private:
         AP_Int8 _protocol_type;
         Protocol_Type _protocol_type_cache;
         AP_HAL::CANProtocol* _driver;
-        AP_HAL::CANProtocol* _uavcan;   // UAVCAN
-        AP_HAL::CANProtocol* _kdecan;   // KDECAN
-        AP_HAL::CANProtocol* _tcan;     // ToshibaCAN
-        AP_HAL::CANProtocol* _pcan;     // PiccoloCAN
+        AP_HAL::CANProtocol* _uavcan;
+        AP_HAL::CANProtocol* _kdecan;
+        AP_HAL::CANProtocol* _tcan;
     };
 
-#if AP_UAVCAN_SLCAN_ENABLED
+#if !HAL_MINIMIZE_FEATURES
     class SLCAN_Interface {
         friend class AP_BoardConfig_CAN;
 

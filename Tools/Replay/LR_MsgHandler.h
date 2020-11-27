@@ -1,8 +1,6 @@
 #pragma once
 
 #include "MsgHandler.h"
-#include <AP_AHRS/AP_AHRS.h>
-#include <AP_GPS/AP_GPS.h>
 
 #include <functional>
 
@@ -41,7 +39,7 @@ public:
         : LR_MsgHandler(_f, _logger,_last_timestamp_usec),
           ahr2_attitude(_ahr2_attitude) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     Vector3f &ahr2_attitude;
@@ -55,7 +53,7 @@ public:
                    uint64_t &_last_timestamp_usec)
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 
@@ -66,7 +64,7 @@ public:
 		    uint64_t &_last_timestamp_usec, AP_Airspeed &_airspeed) :
 	LR_MsgHandler(_f, _logger, _last_timestamp_usec), airspeed(_airspeed) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     AP_Airspeed &airspeed;
@@ -79,7 +77,7 @@ public:
 		    uint64_t &_last_timestamp_usec) :
 	LR_MsgHandler(_f, _logger, _last_timestamp_usec) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 
@@ -90,7 +88,7 @@ public:
                    uint64_t &_last_timestamp_usec, Vector3f &_attitude)
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec), attitude(_attitude)
         { };
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     Vector3f &attitude;
@@ -105,7 +103,7 @@ public:
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec), 
           check_state(_check_state)
         { };
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     CheckState &check_state;
@@ -119,7 +117,7 @@ public:
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec)
         { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 };
 
@@ -131,7 +129,7 @@ public:
                    uint64_t &_last_timestamp_usec)
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 
@@ -165,7 +163,7 @@ public:
                               _gps, _ground_alt_cm),
         gps(_gps), ground_alt_cm(_ground_alt_cm) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 
 private:
     AP_GPS &gps;
@@ -185,7 +183,7 @@ public:
         : LR_MsgHandler_GPS_Base(_f, _logger, _last_timestamp_usec,
                                  _gps, _ground_alt_cm), gps(_gps),
         ground_alt_cm(_ground_alt_cm) { };
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 private:
     AP_GPS &gps;
     uint32_t &ground_alt_cm;
@@ -215,7 +213,7 @@ public:
         : LR_MsgHandler_GPA_Base(_f, _logger,_last_timestamp_usec,
                               _gps), gps(_gps) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 
 private:
     AP_GPS &gps;
@@ -228,7 +226,7 @@ public:
                        uint64_t &_last_timestamp_usec, AP_GPS &_gps)
         : LR_MsgHandler_GPA_Base(_f, _logger, _last_timestamp_usec,
                                  _gps), gps(_gps) { };
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 private:
     AP_GPS &gps;
 };
@@ -266,7 +264,7 @@ public:
         : LR_MsgHandler_IMU_Base(_f, _logger, _last_timestamp_usec,
                               _accel_mask, _gyro_mask, _ins) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 };
 
 class LR_MsgHandler_IMU2 : public LR_MsgHandler_IMU_Base
@@ -279,7 +277,7 @@ public:
         : LR_MsgHandler_IMU_Base(_f, _logger, _last_timestamp_usec,
                               _accel_mask, _gyro_mask, _ins) {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 class LR_MsgHandler_IMU3 : public LR_MsgHandler_IMU_Base
@@ -292,7 +290,7 @@ public:
         : LR_MsgHandler_IMU_Base(_f, _logger, _last_timestamp_usec,
                               _accel_mask, _gyro_mask, _ins) {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 
@@ -329,7 +327,7 @@ public:
         : LR_MsgHandler_IMT_Base(_f, _logger, _last_timestamp_usec,
                                  _accel_mask, _gyro_mask, _use_imt, _ins) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 };
 
 class LR_MsgHandler_IMT2 : public LR_MsgHandler_IMT_Base
@@ -343,7 +341,7 @@ public:
         : LR_MsgHandler_IMT_Base(_f, _logger, _last_timestamp_usec,
                                  _accel_mask, _gyro_mask, _use_imt, _ins) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 };
 
 class LR_MsgHandler_IMT3 : public LR_MsgHandler_IMT_Base
@@ -357,7 +355,7 @@ public:
         : LR_MsgHandler_IMT_Base(_f, _logger, _last_timestamp_usec,
                                  _accel_mask, _gyro_mask, _use_imt, _ins) { };
 
-    void process_message(uint8_t *msg) override;
+    void process_message(uint8_t *msg);
 };
 
 
@@ -382,7 +380,7 @@ public:
                    uint64_t &_last_timestamp_usec, Compass &_compass)
         : LR_MsgHandler_MAG_Base(_f, _logger, _last_timestamp_usec,_compass) {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 class LR_MsgHandler_MAG2 : public LR_MsgHandler_MAG_Base
@@ -392,7 +390,7 @@ public:
                     uint64_t &_last_timestamp_usec, Compass &_compass)
         : LR_MsgHandler_MAG_Base(_f, _logger, _last_timestamp_usec,_compass) {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 };
 
 
@@ -407,7 +405,7 @@ public:
         vehicle(_vehicle), ahrs(_ahrs) { }
 
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     VehicleType::vehicle_type &vehicle;
@@ -422,7 +420,7 @@ public:
 			   uint64_t &_last_timestamp_usec, Vector3f &_inavpos)
 	: LR_MsgHandler(_f, _logger, _last_timestamp_usec), inavpos(_inavpos) {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     Vector3f &inavpos;
@@ -439,7 +437,7 @@ public:
         _set_parameter_callback(set_parameter_callback)
         {};
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     bool set_parameter(const char *name, const float value);
@@ -453,7 +451,7 @@ public:
                      uint64_t &_last_timestamp_usec)
         : LR_MsgHandler(_f, _logger, _last_timestamp_usec) { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
 
@@ -469,7 +467,7 @@ public:
           sim_attitude(_sim_attitude)
         { };
 
-    void process_message(uint8_t *msg) override;
+    virtual void process_message(uint8_t *msg);
 
 private:
     Vector3f &sim_attitude;

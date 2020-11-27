@@ -6,6 +6,15 @@
 
 #define ESC_CALIBRATION_HIGH_THROTTLE   950
 
+// enum for ESC CALIBRATION
+enum ESCCalibrationModes {
+    ESCCAL_NONE = 0,
+    ESCCAL_PASSTHROUGH_IF_THROTTLE_HIGH = 1,
+    ESCCAL_PASSTHROUGH_ALWAYS = 2,
+    ESCCAL_AUTO = 3,
+    ESCCAL_DISABLED = 9,
+};
+
 // check if we should enter esc calibration mode
 void Copter::esc_calibration_startup_check()
 {
@@ -25,19 +34,19 @@ void Copter::esc_calibration_startup_check()
     // exit immediately if pre-arm rc checks fail
     if (!arming.rc_calibration_checks(true)) {
         // clear esc flag for next time
-        if ((g.esc_calibrate != ESCCalibrationModes::ESCCAL_NONE) && (g.esc_calibrate != ESCCalibrationModes::ESCCAL_DISABLED)) {
-            g.esc_calibrate.set_and_save(ESCCalibrationModes::ESCCAL_NONE);
+        if ((g.esc_calibrate != ESCCAL_NONE) && (g.esc_calibrate != ESCCAL_DISABLED)) {
+            g.esc_calibrate.set_and_save(ESCCAL_NONE);
         }
         return;
     }
 
     // check ESC parameter
     switch (g.esc_calibrate) {
-        case ESCCalibrationModes::ESCCAL_NONE:
+        case ESCCAL_NONE:
             // check if throttle is high
             if (channel_throttle->get_control_in() >= ESC_CALIBRATION_HIGH_THROTTLE) {
                 // we will enter esc_calibrate mode on next reboot
-                g.esc_calibrate.set_and_save(ESCCalibrationModes::ESCCAL_PASSTHROUGH_IF_THROTTLE_HIGH);
+                g.esc_calibrate.set_and_save(ESCCAL_PASSTHROUGH_IF_THROTTLE_HIGH);
                 // send message to gcs
                 gcs().send_text(MAV_SEVERITY_CRITICAL,"ESC calibration: Restart board");
                 // turn on esc calibration notification
@@ -46,30 +55,30 @@ void Copter::esc_calibration_startup_check()
                 while(1) { hal.scheduler->delay(5); }
             }
             break;
-        case ESCCalibrationModes::ESCCAL_PASSTHROUGH_IF_THROTTLE_HIGH:
+        case ESCCAL_PASSTHROUGH_IF_THROTTLE_HIGH:
             // check if throttle is high
             if (channel_throttle->get_control_in() >= ESC_CALIBRATION_HIGH_THROTTLE) {
                 // pass through pilot throttle to escs
                 esc_calibration_passthrough();
             }
             break;
-        case ESCCalibrationModes::ESCCAL_PASSTHROUGH_ALWAYS:
+        case ESCCAL_PASSTHROUGH_ALWAYS:
             // pass through pilot throttle to escs
             esc_calibration_passthrough();
             break;
-        case ESCCalibrationModes::ESCCAL_AUTO:
+        case ESCCAL_AUTO:
             // perform automatic ESC calibration
             esc_calibration_auto();
             break;
-        case ESCCalibrationModes::ESCCAL_DISABLED:
+        case ESCCAL_DISABLED:
         default:
             // do nothing
             break;
     }
 
     // clear esc flag for next time
-    if (g.esc_calibrate != ESCCalibrationModes::ESCCAL_DISABLED) {
-        g.esc_calibrate.set_and_save(ESCCalibrationModes::ESCCAL_NONE);
+    if (g.esc_calibrate != ESCCAL_DISABLED) {
+        g.esc_calibrate.set_and_save(ESCCAL_NONE);
     }
 #endif  // FRAME_CONFIG != HELI_FRAME
 }

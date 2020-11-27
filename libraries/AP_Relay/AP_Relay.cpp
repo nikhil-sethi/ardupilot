@@ -115,41 +115,50 @@ AP_Relay::AP_Relay(void)
 }
 
 
-void AP_Relay::init()
+void AP_Relay::init() 
 {
-    if (_default != 0 && _default != 1) {
-        return;
-    }
     for (uint8_t i=0; i<AP_RELAY_NUM_RELAYS; i++) {
-        set(i, _default);
+        if (_pin[i].get() != -1) {
+            switch (_default) {
+            case 0:
+                off(i);
+                break;
+            case 1:
+                on(i);
+                break;
+            default:
+                break;
+            }
+        }
     }
 }
 
-void AP_Relay::set(const uint8_t instance, const bool value)
+void AP_Relay::on(uint8_t relay) 
+{    
+    if (relay < AP_RELAY_NUM_RELAYS && _pin[relay] != -1) {
+        hal.gpio->pinMode(_pin[relay], HAL_GPIO_OUTPUT);
+        hal.gpio->write(_pin[relay], 1);
+    }
+}
+
+
+void AP_Relay::off(uint8_t relay) 
 {
-    if (instance >= AP_RELAY_NUM_RELAYS) {
-        return;
+    if (relay < AP_RELAY_NUM_RELAYS && _pin[relay] != -1) {
+        hal.gpio->pinMode(_pin[relay], HAL_GPIO_OUTPUT);
+        hal.gpio->write(_pin[relay], 0);
     }
-    if (_pin[instance] == -1) {
-        return;
-    }
-    hal.gpio->pinMode(_pin[instance], HAL_GPIO_OUTPUT);
-    hal.gpio->write(_pin[instance], value);
 }
 
-void AP_Relay::toggle(uint8_t instance)
+
+void AP_Relay::toggle(uint8_t relay) 
 {
-    if (instance < AP_RELAY_NUM_RELAYS && _pin[instance] != -1) {
-        bool ison = hal.gpio->read(_pin[instance]);
-        set(instance, !ison);
+    if (relay < AP_RELAY_NUM_RELAYS && _pin[relay] != -1) {
+        bool ison = hal.gpio->read(_pin[relay]);
+        if (ison)
+            off(relay);
+        else
+            on(relay);
     }
 }
 
-namespace AP {
-
-AP_Relay *relay()
-{
-    return AP_Relay::get_singleton();
-}
-
-}

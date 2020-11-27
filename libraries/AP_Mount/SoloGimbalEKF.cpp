@@ -5,14 +5,12 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX
 #pragma GCC optimize("O0")
 #else
-#pragma GCC optimize("O2")
+#pragma GCC optimize("O3")
 #endif
 
 #include "SoloGimbalEKF.h"
 #include <AP_Param/AP_Param.h>
 #include <AP_Vehicle/AP_Vehicle.h>
-#include <AP_NavEKF/AP_Nav_Common.h>
-#include <AP_AHRS/AP_AHRS.h>
 
 #include <stdio.h>
 

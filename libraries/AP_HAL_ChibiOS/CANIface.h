@@ -43,9 +43,7 @@
 #include "AP_HAL_ChibiOS.h"
 
 #if HAL_WITH_UAVCAN
-# if defined(STM32H7XX)
-#include "CANFDIface.h"
-#else
+
 #include "CANThread.h"
 #include "CANIface.h"
 #include "bxcan.hpp"
@@ -86,12 +84,7 @@ struct CanRxItem {
  * The application shall not use this directly.
  */
 class CanIface : public uavcan::ICanIface, uavcan::Noncopyable {
-
-#if AP_UAVCAN_SLCAN_ENABLED
     friend class ::SLCANRouter;
-    static SLCANRouter _slcan_router;
-#endif
-
     class RxQueue {
         CanRxItem* const buf_;
         const uavcan::uint8_t capacity_;
@@ -174,15 +167,15 @@ class CanIface : public uavcan::ICanIface, uavcan::Noncopyable {
     int computeTimings(uavcan::uint32_t target_bitrate, Timings& out_timings);
 
     virtual uavcan::int16_t send(const uavcan::CanFrame& frame, uavcan::MonotonicTime tx_deadline,
-                                 uavcan::CanIOFlags flags) override;
+                                 uavcan::CanIOFlags flags);
 
     virtual uavcan::int16_t receive(uavcan::CanFrame& out_frame, uavcan::MonotonicTime& out_ts_monotonic,
-                                    uavcan::UtcTime& out_ts_utc, uavcan::CanIOFlags& out_flags) override;
+                                    uavcan::UtcTime& out_ts_utc, uavcan::CanIOFlags& out_flags);
 
     virtual uavcan::int16_t configureFilters(const uavcan::CanFilterConfig* filter_configs,
-            uavcan::uint16_t num_configs) override;
+            uavcan::uint16_t num_configs);
 
-    virtual uavcan::uint16_t getNumFilters() const override
+    virtual uavcan::uint16_t getNumFilters() const
     {
         return NumFilters;
     }
@@ -252,7 +245,7 @@ public:
      * Total number of hardware failures and other kinds of errors (e.g. queue overruns).
      * May increase continuously if the interface is not connected to the bus.
      */
-    virtual uavcan::uint64_t getErrorCount() const override;
+    virtual uavcan::uint64_t getErrorCount() const;
 
     /**
      * Number of times the driver exercised library's requirement to abort transmission on first error.
@@ -285,9 +278,6 @@ public:
     {
         return uavcan::uint8_t(peak_tx_mailbox_index_ + 1);
     }
-#if AP_UAVCAN_SLCAN_ENABLED
-    static SLCANRouter &slcan_router() { return _slcan_router; }
-#endif
 };
 
 /**
@@ -307,7 +297,7 @@ class CanDriver : public uavcan::ICanDriver, uavcan::Noncopyable {
 
     virtual uavcan::int16_t select(uavcan::CanSelectMasks& inout_masks,
                                    const uavcan::CanFrame* (& pending_tx)[uavcan::MaxCanIfaces],
-                                   uavcan::MonotonicTime blocking_deadline) override;
+                                   uavcan::MonotonicTime blocking_deadline);
 
     static void initOnce();
     static void initOnce(uavcan::uint8_t can_number, bool enable_irqs);
@@ -345,9 +335,9 @@ public:
     int init(const uavcan::uint32_t bitrate, const CanIface::OperatingMode mode);
     int init(const uavcan::uint32_t bitrate, const CanIface::OperatingMode mode, uavcan::uint8_t can_number);
 
-    virtual CanIface* getIface(uavcan::uint8_t iface_index) override;
+    virtual CanIface* getIface(uavcan::uint8_t iface_index);
 
-    virtual uavcan::uint8_t getNumIfaces() const override
+    virtual uavcan::uint8_t getNumIfaces() const
     {
         return num_ifaces_;
     }
@@ -454,5 +444,5 @@ public:
 }
 
 #include "CANSerialRouter.h"
-#endif // defined(STM32H7XX)
+
 #endif //HAL_WITH_UAVCAN

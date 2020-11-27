@@ -19,7 +19,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 
-#if AP_UAVCAN_SLCAN_ENABLED
+#if HAL_WITH_UAVCAN && !HAL_MINIMIZE_FEATURES && CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 
 #include "AP_UAVCAN_SLCAN.h"
 #include <AP_SerialManager/AP_SerialManager.h>
@@ -75,7 +75,7 @@ bool SLCAN::CAN::push_Frame(uavcan::CanFrame &frame)
     frm.frame = frame;
     frm.flags = 0;
     frm.utc_usec = AP_HAL::micros64();
-    ChibiOS_CAN::CanIface::slcan_router().route_frame_to_can(frm.frame, frm.utc_usec);
+    slcan_router().route_frame_to_can(frm.frame, frm.utc_usec);
     return rx_queue_.push(frm);
 }
 
@@ -568,5 +568,4 @@ void SLCAN::CANManager::reader_trampoline(void)
     }
 }
 
-#endif // AP_UAVCAN_SLCAN_ENABLED
-
+#endif //HAL_WITH_UAVCAN

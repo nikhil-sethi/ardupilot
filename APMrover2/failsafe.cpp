@@ -5,8 +5,6 @@
 
 #include "Rover.h"
 
-#include <stdio.h>
-
 /*
   our failsafe strategy is to detect main loop lockup and switch to
   passing inputs straight from the RC inputs to RC outputs.
@@ -64,13 +62,13 @@ void Rover::failsafe_trigger(uint8_t failsafe_type, bool on)
 
     failsafe.triggered &= failsafe.bits;
 
-    if ((failsafe.triggered == 0) &&
-        (failsafe.bits != 0) &&
-        (millis() - failsafe.start_time > g.fs_timeout * 1000) &&
-        (control_mode != &mode_rtl) &&
-        ((control_mode != &mode_hold || (g2.fs_options & (uint32_t)Failsafe_Options::Failsafe_Option_Active_In_Hold)))) {
+    if (failsafe.triggered == 0 &&
+        failsafe.bits != 0 &&
+        millis() - failsafe.start_time > g.fs_timeout * 1000 &&
+        control_mode != &mode_rtl &&
+        control_mode != &mode_hold) {
         failsafe.triggered = failsafe.bits;
-        gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe trigger 0x%x", (unsigned int)failsafe.triggered);
+        gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe trigger 0x%x", static_cast<uint32_t>(failsafe.triggered));
 
         // clear rc overrides
         RC_Channels::clear_overrides();
@@ -84,23 +82,23 @@ void Rover::failsafe_trigger(uint8_t failsafe_type, bool on)
             case Failsafe_Action_None:
                 break;
             case Failsafe_Action_RTL:
-                if (!set_mode(mode_rtl, ModeReason::FAILSAFE)) {
-                    set_mode(mode_hold, ModeReason::FAILSAFE);
+                if (!set_mode(mode_rtl, MODE_REASON_FAILSAFE)) {
+                    set_mode(mode_hold, MODE_REASON_FAILSAFE);
                 }
                 break;
             case Failsafe_Action_Hold:
-                set_mode(mode_hold, ModeReason::FAILSAFE);
+                set_mode(mode_hold, MODE_REASON_FAILSAFE);
                 break;
             case Failsafe_Action_SmartRTL:
-                if (!set_mode(mode_smartrtl, ModeReason::FAILSAFE)) {
-                    if (!set_mode(mode_rtl, ModeReason::FAILSAFE)) {
-                        set_mode(mode_hold, ModeReason::FAILSAFE);
+                if (!set_mode(mode_smartrtl, MODE_REASON_FAILSAFE)) {
+                    if (!set_mode(mode_rtl, MODE_REASON_FAILSAFE)) {
+                        set_mode(mode_hold, MODE_REASON_FAILSAFE);
                     }
                 }
                 break;
             case Failsafe_Action_SmartRTL_Hold:
-                if (!set_mode(mode_smartrtl, ModeReason::FAILSAFE)) {
-                    set_mode(mode_hold, ModeReason::FAILSAFE);
+                if (!set_mode(mode_smartrtl, MODE_REASON_FAILSAFE)) {
+                    set_mode(mode_hold, MODE_REASON_FAILSAFE);
                 }
                 break;
             }
@@ -114,21 +112,21 @@ void Rover::handle_battery_failsafe(const char* type_str, const int8_t action)
             case Failsafe_Action_None:
                 break;
             case Failsafe_Action_SmartRTL:
-                if (set_mode(mode_smartrtl, ModeReason::BATTERY_FAILSAFE)) {
+                if (set_mode(mode_smartrtl, MODE_REASON_FAILSAFE)) {
                     break;
                 }
                 FALLTHROUGH;
             case Failsafe_Action_RTL:
-                if (set_mode(mode_rtl, ModeReason::BATTERY_FAILSAFE)) {
+                if (set_mode(mode_rtl, MODE_REASON_FAILSAFE)) {
                     break;
                 }
                 FALLTHROUGH;
             case Failsafe_Action_Hold:
-                set_mode(mode_hold, ModeReason::BATTERY_FAILSAFE);
+                set_mode(mode_hold, MODE_REASON_FAILSAFE);
                 break;
             case Failsafe_Action_SmartRTL_Hold:
-                if (!set_mode(mode_smartrtl, ModeReason::BATTERY_FAILSAFE)) {
-                    set_mode(mode_hold, ModeReason::BATTERY_FAILSAFE);
+                if (!set_mode(mode_smartrtl, MODE_REASON_FAILSAFE)) {
+                    set_mode(mode_hold, MODE_REASON_FAILSAFE);
                 }
                 break;
             case Failsafe_Action_Terminate:

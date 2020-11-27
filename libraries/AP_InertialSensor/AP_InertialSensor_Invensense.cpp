@@ -174,7 +174,9 @@ bool AP_InertialSensor_Invensense::_has_auxiliary_bus()
 
 void AP_InertialSensor_Invensense::start()
 {
-    _dev->get_semaphore()->take_blocking();
+    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return;
+    }
 
     // initially run the bus at low speed
     _dev->set_speed(AP_HAL::Device::SPEED_LOW);
@@ -767,7 +769,9 @@ bool AP_InertialSensor_Invensense::_check_whoami(void)
 
 bool AP_InertialSensor_Invensense::_hardware_init(void)
 {
-    _dev->get_semaphore()->take_blocking();
+    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return false;
+    }
 
     // setup for register checking. We check much less often on I2C
     // where the cost of the checks is higher
@@ -981,8 +985,10 @@ void AP_Invensense_AuxiliaryBus::_configure_slaves()
         return;
     }
     
-    backend._dev->get_semaphore()->take_blocking();
-
+    if (!backend._dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return;
+    }
+    
     /* Enable the I2C master to slaves on the auxiliary I2C bus*/
     if (!(backend._last_stat_user_ctrl & BIT_USER_CTRL_I2C_MST_EN)) {
         backend._last_stat_user_ctrl |= BIT_USER_CTRL_I2C_MST_EN;

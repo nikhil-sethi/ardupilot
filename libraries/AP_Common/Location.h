@@ -86,8 +86,6 @@ public:
 
     // return bearing in centi-degrees from location to loc2
     int32_t get_bearing_to(const struct Location &loc2) const;
-    // return the bearing in radians
-    float get_bearing(const struct Location &loc2) const { return radians(get_bearing_to(loc2) * 0.01f); } ;
 
     // check if lat and lng match. Ignore altitude and options
     bool same_latlon_as(const Location &loc2) const;
@@ -113,8 +111,6 @@ public:
       This will be more than 1 if we have passed point2
      */
     float line_path_proportion(const Location &point1, const Location &point2) const;
-
-    bool initialised() const { return (lat !=0 || lng != 0 || alt != 0); }
 
 private:
     static AP_Terrain *_terrain;

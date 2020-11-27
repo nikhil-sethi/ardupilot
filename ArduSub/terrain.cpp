@@ -27,3 +27,12 @@ void Sub::terrain_logging()
 #endif
 }
 
+// should we use terrain data for things including the home altitude
+bool Sub::terrain_use()
+{
+#if AP_TERRAIN_AVAILABLE && AC_TERRAIN
+    return (g.terrain_follow > 0);
+#else
+    return false;
+#endif
+}

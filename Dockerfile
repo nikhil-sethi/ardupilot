@@ -8,22 +8,15 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-instal
     lsb-release \
     sudo \
     software-properties-common \
-    python-software-properties
+    python-software-properties && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV USER=ardupilot
 ADD . /ardupilot
-
-RUN echo "ardupilot ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ardupilot
-RUN chmod 0440 /etc/sudoers.d/ardupilot
-
-RUN chown -R ardupilot:ardupilot /ardupilot
+RUN chown -R ardupilot:ardupilot /ardupilot && \
+    bash -c "Tools/environment_install/install-prereqs-ubuntu.sh -y && apt-get install gcc-arm-none-eabi -y" && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 USER ardupilot
-RUN bash -c "Tools/environment_install/install-prereqs-ubuntu.sh -y"
-RUN sudo apt-get clean \
-    && sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 ENV CCACHE_MAXSIZE=1G
 ENV PATH /usr/lib/ccache:/ardupilot/Tools:${PATH}
-ENV PATH /ardupilot/Tools/autotest:${PATH}
-ENV PATH /ardupilot/.local/bin:$PATH

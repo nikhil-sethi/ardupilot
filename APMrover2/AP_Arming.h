@@ -18,7 +18,7 @@ public:
 
     bool pre_arm_checks(bool report) override;
     bool arm_checks(AP_Arming::Method method) override;
-    bool rc_calibration_checks(const bool display_failure) override;
+    bool pre_arm_rc_checks(const bool display_failure);
     bool gps_checks(bool display_failure) override;
 
     bool disarm() override;
@@ -27,8 +27,9 @@ public:
     void update_soft_armed();
 
 protected:
-    // the following check functions do not call into AP_Arming
     bool oa_check(bool report);
-    bool parameter_checks(bool report);
 
+private:
+
+    void change_arm_state(void);
 };

@@ -224,7 +224,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //  Crop Sprayer - enabled only on larger firmwares
 #ifndef SPRAYER_ENABLED
- # define SPRAYER_ENABLED  HAL_SPRAYER_ENABLED
+ # define SPRAYER_ENABLED  !HAL_MINIMIZE_FEATURES
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -254,7 +254,7 @@
 //////////////////////////////////////////////////////////////////////////////
 // Parachute release
 #ifndef PARACHUTE
- # define PARACHUTE HAL_PARACHUTE_ENABLED
+ # define PARACHUTE ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -354,12 +354,6 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// System ID - conduct system identification tests on vehicle
-#ifndef MODE_SYSTEMID_ENABLED
-# define MODE_SYSTEMID_ENABLED !HAL_MINIMIZE_FEATURES
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
 // Throw - fly vehicle after throwing it in the air
 #ifndef MODE_THROW_ENABLED
 # define MODE_THROW_ENABLED ENABLED
@@ -372,31 +366,9 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////
-// Autorotate - autonomous auto-rotation - helicopters only
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    #if FRAME_CONFIG == HELI_FRAME
-        #ifndef MODE_AUTOROTATE_ENABLED
-        # define MODE_AUTOROTATE_ENABLED !HAL_MINIMIZE_FEATURES
-        #endif
-    #else
-        # define MODE_AUTOROTATE_ENABLED DISABLED
-    #endif
-#else
-    # define MODE_AUTOROTATE_ENABLED DISABLED
-#endif
-//////////////////////////////////////////////////////////////////////////////
-
 // Beacon support - support for local positioning systems
 #ifndef BEACON_ENABLED
 # define BEACON_ENABLED !HAL_MINIMIZE_FEATURES
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
-// Button - Enable the button connected to AUX1-6
-#ifndef BUTTON_ENABLED
- # define BUTTON_ENABLED ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -410,22 +382,22 @@
 //
 
 #ifndef FLIGHT_MODE_1
- # define FLIGHT_MODE_1                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_1                  STABILIZE
 #endif
 #ifndef FLIGHT_MODE_2
- # define FLIGHT_MODE_2                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_2                  STABILIZE
 #endif
 #ifndef FLIGHT_MODE_3
- # define FLIGHT_MODE_3                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_3                  STABILIZE
 #endif
 #ifndef FLIGHT_MODE_4
- # define FLIGHT_MODE_4                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_4                  STABILIZE
 #endif
 #ifndef FLIGHT_MODE_5
- # define FLIGHT_MODE_5                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_5                  STABILIZE
 #endif
 #ifndef FLIGHT_MODE_6
- # define FLIGHT_MODE_6                  Mode::Number::STABILIZE
+ # define FLIGHT_MODE_6                  STABILIZE
 #endif
 
 
@@ -705,10 +677,6 @@
  #define AC_AVOID_ENABLED   ENABLED
 #endif
 
-#ifndef AC_OAPATHPLANNER_ENABLED
- #define AC_OAPATHPLANNER_ENABLED   !HAL_MINIMIZE_FEATURES
-#endif
-
 #if AC_AVOID_ENABLED && !PROXIMITY_ENABLED
   #error AC_Avoidance relies on PROXIMITY_ENABLED which is disabled
 #endif
@@ -752,10 +720,6 @@
   #error Follow requires ModeGuided which is disabled
 #endif
 
-#if MODE_GUIDED_NOGPS_ENABLED && !MODE_GUIDED_ENABLED
-  #error ModeGuided-NoGPS requires ModeGuided which is disabled
-#endif
-
 //////////////////////////////////////////////////////////////////////////////
 // Developer Items
 //
@@ -783,6 +747,14 @@
 
 #ifndef STATS_ENABLED
  # define STATS_ENABLED ENABLED
+#endif
+
+#ifndef DEVO_TELEM_ENABLED
+#if HAL_MINIMIZE_FEATURES
+ #define DEVO_TELEM_ENABLED DISABLED
+#else
+ #define DEVO_TELEM_ENABLED ENABLED
+#endif
 #endif
 
 #ifndef OSD_ENABLED

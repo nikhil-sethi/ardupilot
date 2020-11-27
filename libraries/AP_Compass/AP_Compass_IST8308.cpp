@@ -109,7 +109,9 @@ bool AP_Compass_IST8308::init()
 {
     uint8_t reset_count = 0;
 
-    _dev->get_semaphore()->take_blocking();
+    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return false;
+    }
 
     // high retries for init
     _dev->set_retries(10);

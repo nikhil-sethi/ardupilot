@@ -8,16 +8,10 @@ bool ModeFollow::_enter()
         return false;
     }
 
-    // initialise speed to waypoint speed
-    _desired_speed = g2.wp_nav.get_default_speed();
+    // initialise waypoint speed
+    set_desired_speed_to_default();
 
     return true;
-}
-
-// exit handling
-void ModeFollow::_exit()
-{
-    g2.follow.clear_offsets_if_required();
 }
 
 void ModeFollow::update()
@@ -84,14 +78,4 @@ float ModeFollow::wp_bearing() const
 float ModeFollow::get_distance_to_destination() const
 {
     return g2.follow.get_distance_to_target();
-}
-
-// set desired speed in m/s
-bool ModeFollow::set_desired_speed(float speed)
-{
-    if (is_negative(speed)) {
-        return false;
-    }
-    _desired_speed = speed;
-    return true;
 }

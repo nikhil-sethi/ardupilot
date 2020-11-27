@@ -15,7 +15,6 @@
 
 #include "AP_WheelEncoder.h"
 #include "WheelEncoder_Quadrature.h"
-#include "WheelEncoder_SITL_Quadrature.h"
 #include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
@@ -25,7 +24,7 @@ const AP_Param::GroupInfo AP_WheelEncoder::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: WheelEncoder type
     // @Description: What type of WheelEncoder is connected
-    // @Values: 0:None,1:Quadrature,10:SITL Quadrature
+    // @Values: 0:None,1:Quadrature
     // @User: Standard
     AP_GROUPINFO_FLAGS("_TYPE", 0, AP_WheelEncoder, _type[0], 0, AP_PARAM_FLAG_ENABLE),
 
@@ -84,7 +83,7 @@ const AP_Param::GroupInfo AP_WheelEncoder::var_info[] = {
     // @Param: 2_TYPE
     // @DisplayName: Second WheelEncoder type
     // @Description: What type of WheelEncoder sensor is connected
-    // @Values: 0:None,1:Quadrature,10:SITL Quadrature
+    // @Values: 0:None,1:Quadrature
     // @User: Standard
     AP_GROUPINFO("2_TYPE",   6, AP_WheelEncoder, _type[1], 0),
 
@@ -156,24 +155,15 @@ void AP_WheelEncoder::init(void)
         return;
     }
     for (uint8_t i=0; i<WHEELENCODER_MAX_INSTANCES; i++) {
-        switch ((WheelEncoder_Type)_type[i].get()) {
-
-        case WheelEncoder_TYPE_QUADRATURE:
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
+        switch ((WheelEncoder_Type)_type[i].get()) {
+        case WheelEncoder_TYPE_QUADRATURE:
             drivers[i] = new AP_WheelEncoder_Quadrature(*this, i, state[i]);
-#endif
             break;
-
-        case WheelEncoder_TYPE_SITL_QUADRATURE:
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-            drivers[i] = new AP_WheelEncoder_SITL_Qaudrature(*this, i, state[i]);
-#endif
-            break;
-            
         case WheelEncoder_TYPE_NONE:
             break;
         }
-
+#endif
 
         if (drivers[i] != nullptr) {
             // we loaded a driver for this instance, so it must be

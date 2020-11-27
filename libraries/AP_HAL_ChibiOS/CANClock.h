@@ -139,17 +139,17 @@ void setUtcSyncParams(const UtcSyncParams& params);
 class SystemClock : public uavcan::ISystemClock, uavcan::Noncopyable {
     SystemClock() { }
 
-    virtual void adjustUtc(uavcan::UtcDuration adjustment) override
+    virtual void adjustUtc(uavcan::UtcDuration adjustment)
     {
         clock::adjustUtc(adjustment);
     }
 
 public:
-    virtual uavcan::MonotonicTime getMonotonic() const override
+    virtual uavcan::MonotonicTime getMonotonic() const
     {
         return clock::getMonotonic();
     }
-    virtual uavcan::UtcTime getUtc()             const override
+    virtual uavcan::UtcTime getUtc()             const
     {
         return clock::getUtc();
     }

@@ -2,8 +2,7 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
-
-#if AP_UAVCAN_SLCAN_ENABLED
+#if HAL_WITH_UAVCAN && CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
 
 #include <AP_UAVCAN/AP_UAVCAN.h>
 #include "AP_HAL/utility/RingBuffer.h"
@@ -43,7 +42,7 @@ struct CanRxItem {
     {
     }
 };
-class CAN: public AP_HAL::CANHal {
+class CAN: public AP_HAL::CAN {
     friend class CANManager;
     friend class ::SLCANRouter;
     struct TxItem {
@@ -236,5 +235,4 @@ public:
 }
 #include <AP_HAL_ChibiOS/CANSerialRouter.h>
 
-#endif // AP_UAVCAN_SLCAN_ENABLED
-
+#endif //#if HAL_WITH_UAVCAN && !HAL_MINIMIZE_FEATURES

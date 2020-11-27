@@ -54,9 +54,6 @@ void Copter::update_land_detector()
 #endif
             set_land_complete(false);
         }
-    } else if (standby_active) {
-        // land detector will not run in standby mode
-        land_detector_count = 0;
     } else {
 
 #if FRAME_CONFIG == HELI_FRAME
@@ -102,9 +99,9 @@ void Copter::set_land_complete(bool b)
     land_detector_count = 0;
 
     if(b){
-        AP::logger().Write_Event(LogEvent::LAND_COMPLETE);
+        Log_Write_Event(DATA_LAND_COMPLETE);
     } else {
-        AP::logger().Write_Event(LogEvent::NOT_LANDED);
+        Log_Write_Event(DATA_NOT_LANDED);
     }
     ap.land_complete = b;
 
@@ -113,7 +110,7 @@ void Copter::set_land_complete(bool b)
 #endif
 
     // tell AHRS flying state
-    set_likely_flying(!b);
+    ahrs.set_likely_flying(!b);
     
     // trigger disarm-on-land if configured
     bool disarm_on_land_configured = (g.throttle_behavior & THR_BEHAVE_DISARM_ON_LAND_DETECT) != 0;
@@ -132,7 +129,7 @@ void Copter::set_land_complete_maybe(bool b)
         return;
 
     if (b) {
-        AP::logger().Write_Event(LogEvent::LAND_COMPLETE_MAYBE);
+        Log_Write_Event(DATA_LAND_COMPLETE_MAYBE);
     }
     ap.land_complete_maybe = b;
 }
@@ -176,7 +173,7 @@ void Copter::update_throttle_thr_mix()
         bool descent_not_demanded = pos_control->get_desired_velocity().z >= 0.0f;
 
         if ( large_angle_request || large_angle_error || accel_moving || descent_not_demanded) {
-            attitude_control->set_throttle_mix_max(pos_control->get_vel_z_control_ratio());
+            attitude_control->set_throttle_mix_max();
         } else {
             attitude_control->set_throttle_mix_min();
         }

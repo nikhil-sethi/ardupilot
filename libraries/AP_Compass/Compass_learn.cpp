@@ -9,9 +9,6 @@
 #include <GCS_MAVLink/GCS.h>
 
 #include <stdio.h>
-#include <AP_Vehicle/AP_Vehicle.h>
-
-#if COMPASS_LEARN_ENABLED
 
 extern const AP_HAL::HAL &hal;
 
@@ -20,13 +17,6 @@ CompassLearn::CompassLearn(Compass &_compass) :
     compass(_compass)
 {
     gcs().send_text(MAV_SEVERITY_INFO, "CompassLearn: Initialised");
-    for (uint8_t i=0; i<compass.get_count(); i++) {
-        if (compass._state[i].use_for_yaw) {
-            // reset scale factors, we can't learn scale factors in
-            // flight
-            compass.set_and_save_scale_factor(i, 0.0);
-        }
-    }
 }
 
 /*
@@ -34,15 +24,14 @@ CompassLearn::CompassLearn(Compass &_compass) :
  */
 void CompassLearn::update(void)
 {
-    const AP_Vehicle *vehicle = AP::vehicle();
+    const AP_AHRS &ahrs = AP::ahrs();
     if (converged || compass.get_learn_type() != Compass::LEARN_INFLIGHT ||
-        !hal.util->get_soft_armed() || vehicle->get_time_flying_ms() < 3000) {
+        !hal.util->get_soft_armed() || ahrs.get_time_flying_ms() < 3000) {
         // only learn when flying and with enough time to be clear of
         // the ground
         return;
     }
 
-    const AP_AHRS &ahrs = AP::ahrs();
     if (!have_earth_field) {
         Location loc;
         if (!ahrs.get_position(loc)) {
@@ -142,7 +131,6 @@ void CompassLearn::update(void)
             for (uint8_t i=0; i<compass.get_count(); i++) {
                 if (compass._state[i].use_for_yaw) {
                     compass.save_offsets(i);
-                    compass.set_and_save_scale_factor(i, 0.0);
                     compass.set_use_for_yaw(i, true);
                 }
             }
@@ -241,6 +229,3 @@ void CompassLearn::process_sample(const struct sample &s)
     worst_error = worstv;
     best_yaw_deg = wrap_360(degrees(s.attitude.z) + besti * (360/num_sectors));
 }
-
-#endif // COMPASS_LEARN_ENABLED
-

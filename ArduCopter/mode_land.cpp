@@ -34,9 +34,6 @@ bool ModeLand::init(bool ignore_checks)
     // reset flag indicating if pilot has applied roll or pitch inputs during landing
     copter.ap.land_repo_active = false;
 
-    // initialise yaw
-    auto_yaw.set_mode(AUTO_YAW_HOLD);
-
     return true;
 }
 
@@ -64,7 +61,6 @@ void ModeLand::gps_run()
     // Land State Machine Determination
     if (is_disarmed_or_landed()) {
         make_safe_spool_down();
-        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
     } else {
         // set motors to full range
@@ -91,9 +87,9 @@ void ModeLand::nogps_run()
     // process pilot inputs
     if (!copter.failsafe.radio) {
         if ((g.throttle_behavior & THR_BEHAVE_HIGH_THROTTLE_CANCELS_LAND) != 0 && copter.rc_throttle_control_in_filter.get() > LAND_CANCEL_TRIGGER_THR){
-            AP::logger().Write_Event(LogEvent::LAND_CANCELLED_BY_PILOT);
+            Log_Write_Event(DATA_LAND_CANCELLED_BY_PILOT);
             // exit land if throttle is high
-            copter.set_mode(Mode::Number::ALT_HOLD, ModeReason::THROTTLE_LAND_ESCAPE);
+            copter.set_mode(ALT_HOLD, MODE_REASON_THROTTLE_LAND_ESCAPE);
         }
 
         if (g.land_repositioning) {
@@ -145,9 +141,9 @@ void ModeLand::do_not_use_GPS()
 
 // set_mode_land_with_pause - sets mode to LAND and triggers 4 second delay before descent starts
 //  this is always called from a failsafe so we trigger notification to pilot
-void Copter::set_mode_land_with_pause(ModeReason reason)
+void Copter::set_mode_land_with_pause(mode_reason_t reason)
 {
-    set_mode(Mode::Number::LAND, reason);
+    set_mode(LAND, reason);
     land_pause = true;
 
     // alert pilot to mode change
@@ -157,5 +153,5 @@ void Copter::set_mode_land_with_pause(ModeReason reason)
 // landing_with_GPS - returns true if vehicle is landing using GPS
 bool Copter::landing_with_GPS()
 {
-    return (control_mode == Mode::Number::LAND && land_with_gps);
+    return (control_mode == LAND && land_with_gps);
 }

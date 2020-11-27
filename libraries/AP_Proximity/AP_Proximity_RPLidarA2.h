@@ -39,10 +39,10 @@ class AP_Proximity_RPLidarA2 : public AP_Proximity_Backend
 
 public:
     // constructor
-    AP_Proximity_RPLidarA2(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state);
+    AP_Proximity_RPLidarA2(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state, AP_SerialManager &serial_manager);
 
     // static detection function
-    static bool detect();
+    static bool detect(AP_SerialManager &serial_manager);
 
     // update state
     void update(void) override;
@@ -69,6 +69,7 @@ private:
 
     // initialise sensor (returns true if sensor is successfully initialised)
     bool initialise();
+    void init_sectors();
     void set_scan_mode();
 
     // send request for something from sensor
@@ -86,6 +87,7 @@ private:
     bool _information_data;
     bool _resetted;
     bool _initialised;
+    bool _sector_initialised;
 
     uint8_t _payload_length;
     uint8_t _cnt;

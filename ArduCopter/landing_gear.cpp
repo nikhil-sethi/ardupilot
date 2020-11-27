@@ -21,9 +21,9 @@ void Copter::landinggear_update()
     // send event message to datalog if status has changed
     if (landinggear.deployed() != last_deploy_status) {
         if (landinggear.deployed()) {
-            AP::logger().Write_Event(LogEvent::LANDING_GEAR_DEPLOYED);
+            Log_Write_Event(DATA_LANDING_GEAR_DEPLOYED);
         } else {
-            AP::logger().Write_Event(LogEvent::LANDING_GEAR_RETRACTED);
+            Log_Write_Event(DATA_LANDING_GEAR_RETRACTED);
         }
     }
 
@@ -34,18 +34,18 @@ void Copter::landinggear_update()
 
     // use rangefinder if available
     switch (rangefinder.status_orient(ROTATION_PITCH_270)) {
-    case RangeFinder::Status::NotConnected:
-    case RangeFinder::Status::NoData:
+    case RangeFinder::RangeFinder_NotConnected:
+    case RangeFinder::RangeFinder_NoData:
         // use altitude above home for non-functioning rangefinder
         break;
 
-    case RangeFinder::Status::OutOfRangeLow:
+    case RangeFinder::RangeFinder_OutOfRangeLow:
         // altitude is close to zero (gear should deploy)
         height_cm = 0;
         break;
 
-    case RangeFinder::Status::OutOfRangeHigh:
-    case RangeFinder::Status::Good:
+    case RangeFinder::RangeFinder_OutOfRangeHigh:
+    case RangeFinder::RangeFinder_Good:
         // use last good reading
         height_cm = rangefinder_state.alt_cm_filt.get();
         break;

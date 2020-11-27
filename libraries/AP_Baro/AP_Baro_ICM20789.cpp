@@ -94,7 +94,9 @@ AP_Baro_Backend *AP_Baro_ICM20789::probe(AP_Baro &baro,
 */
 bool AP_Baro_ICM20789::imu_spi_init(void)
 {
-    dev_imu->get_semaphore()->take_blocking();
+    if (!dev_imu->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        AP_HAL::panic("PANIC: AP_Baro_ICM20789: failed to take serial semaphore ICM");
+    }
 
     dev_imu->set_read_flag(0x80);
 
@@ -170,7 +172,9 @@ bool AP_Baro_ICM20789::init()
 
     debug("Looking for 20789 baro\n");
 
-    dev->get_semaphore()->take_blocking();
+    if (!dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        AP_HAL::panic("PANIC: AP_Baro_ICM20789: failed to take serial semaphore for init");
+    }
 
     debug("Setting up IMU\n");
     if (dev_imu->bus_type() != AP_HAL::Device::BUS_TYPE_I2C) {

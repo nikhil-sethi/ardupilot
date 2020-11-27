@@ -72,7 +72,9 @@ AP_RangeFinder_Backend *AP_RangeFinder_TeraRangerI2C::detect(RangeFinder::RangeF
  */
 bool AP_RangeFinder_TeraRangerI2C::init(void)
 {
-    dev->get_semaphore()->take_blocking();
+    if (!dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        return false;
+    }
 
     dev->set_retries(10);
 
@@ -189,6 +191,6 @@ void AP_RangeFinder_TeraRangerI2C::update(void)
         accum.count = 0;
         update_status();        
     } else if (AP_HAL::millis() - state.last_reading_ms > 200) {
-        set_status(RangeFinder::Status::NoData);
+        set_status(RangeFinder::RangeFinder_NoData);
     }
 }

@@ -37,12 +37,8 @@ public:
     virtual void update() override;
 
     // handle LED control, only used when LED_OVERRIDE=1
-    virtual void handle_led_control(const mavlink_message_t &msg) override;
-
-    // RGB control
-    // give RGB and flash rate, used with scripting
-    virtual void rgb_control(uint8_t r, uint8_t g, uint8_t b, uint8_t rate_hz) override;
-
+    virtual void handle_led_control(mavlink_message_t *msg) override;
+    
 protected:
     // methods implemented in hardware specific classes
     virtual bool hw_init(void) = 0;
@@ -71,7 +67,6 @@ private:
     void update_colours();
     uint32_t get_colour_sequence() const;
     uint32_t get_colour_sequence_obc() const;
-    uint32_t get_colour_sequence_traffic_light() const;
 
     uint8_t get_brightness(void) const;
 
@@ -113,7 +108,6 @@ private:
         standard = 0,
         mavlink = 1,
         obc = 2,
-        traffic_light = 3,
     };
     rgb_source_t rgb_source() const;
 

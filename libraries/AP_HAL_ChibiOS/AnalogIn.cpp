@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
+ * 
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #include <AP_HAL/AP_HAL.h>
@@ -34,8 +34,6 @@ extern AP_IOMCU iomcu;
 #define CHIBIOS_ADC_MAVLINK_DEBUG 0
 #endif
 
-// MAVLink is included as we send a mavlink message as part of debug,
-// and also use the MAV_POWER flags below in update_power_flags
 #include <GCS_MAVLink/GCS_MAVLink.h>
 
 #define ANLOGIN_DEBUGGING 0
@@ -58,7 +56,7 @@ using namespace ChibiOS;
 
 /*
   scaling table between ADC count and actual input voltage, to account
-  for voltage dividers on the board.
+  for voltage dividers on the board. 
  */
 const AnalogIn::pin_info AnalogIn::pin_config[] = HAL_ANALOG_PINS;
 
@@ -81,7 +79,7 @@ AnalogSource::AnalogSource(int16_t pin, float initial_value) :
 }
 
 
-float AnalogSource::read_average()
+float AnalogSource::read_average() 
 {
     WITH_SEMAPHORE(_semaphore);
 
@@ -97,7 +95,7 @@ float AnalogSource::read_average()
     return _value;
 }
 
-float AnalogSource::read_latest()
+float AnalogSource::read_latest() 
 {
     return _latest_value;
 }
@@ -190,9 +188,9 @@ void AnalogIn::adccallback(ADCDriver *adcp)
 {
     const adcsample_t *buffer = samples;
 
-    stm32_cacheBufferInvalidate(buffer, sizeof(adcsample_t)*ADC_DMA_BUF_DEPTH*ADC_GRP1_NUM_CHANNELS);
+    cacheBufferInvalidate(buffer, sizeof(adcsample_t)*ADC_DMA_BUF_DEPTH*ADC_GRP1_NUM_CHANNELS);
     for (uint8_t i = 0; i < ADC_DMA_BUF_DEPTH; i++) {
-        for (uint8_t j = 0; j < ADC_GRP1_NUM_CHANNELS; j++) {
+        for (uint8_t j = 0; j < ADC_GRP1_NUM_CHANNELS; j++) { 
             sample_sum[j] += *buffer++;
         }
     }
@@ -290,7 +288,7 @@ void AnalogIn::_timer_tick(void)
 
     // update power status flags
     update_power_flags();
-
+    
     // match the incoming channels to the currently active pins
     for (uint8_t i=0; i < ADC_GRP1_NUM_CHANNELS; i++) {
 #ifdef ANALOG_VCC_5V_PIN
@@ -300,11 +298,6 @@ void AnalogIn::_timer_tick(void)
             _board_voltage = buf_adc[i] * pin_config[i].scaling;
         }
 #endif
-#ifdef FMU_SERVORAIL_ADC_CHAN
-        if (pin_config[i].channel == FMU_SERVORAIL_ADC_CHAN) {
-           _servorail_voltage = buf_adc[i] * pin_config[i].scaling;
-        }
-#endif
     }
 
 #if HAL_WITH_IO_MCU
@@ -312,7 +305,7 @@ void AnalogIn::_timer_tick(void)
     _servorail_voltage = iomcu.get_vservo();
     _rssi_voltage = iomcu.get_vrssi();
 #endif
-
+    
     for (uint8_t i=0; i<ADC_GRP1_NUM_CHANNELS; i++) {
         Debug("chan %u value=%u\n",
               (unsigned)pin_config[i].channel,
@@ -347,7 +340,7 @@ void AnalogIn::_timer_tick(void)
 #endif
 }
 
-AP_HAL::AnalogSource* AnalogIn::channel(int16_t pin)
+AP_HAL::AnalogSource* AnalogIn::channel(int16_t pin) 
 {
     for (uint8_t j=0; j<ANALOG_MAX_CHANNELS; j++) {
         if (_channels[j] == nullptr) {
@@ -371,7 +364,7 @@ void AnalogIn::update_power_flags(void)
         flags |= MAV_POWER_STATUS_BRICK_VALID;
     }
 #endif
-
+    
 #ifdef HAL_GPIO_PIN_VDD_SERVO_VALID
     if (!palReadLine(HAL_GPIO_PIN_VDD_SERVO_VALID)) {
         flags |= MAV_POWER_STATUS_SERVO_VALID;
@@ -392,20 +385,20 @@ void AnalogIn::update_power_flags(void)
         flags |= MAV_POWER_STATUS_USB_CONNECTED;
     }
 #endif
-
+    
 #ifdef HAL_GPIO_PIN_VDD_5V_HIPOWER_OC
     if (!palReadLine(HAL_GPIO_PIN_VDD_5V_HIPOWER_OC)) {
         flags |= MAV_POWER_STATUS_PERIPH_HIPOWER_OVERCURRENT;
-    }
+    }    
 #endif
 
 #ifdef HAL_GPIO_PIN_VDD_5V_PERIPH_OC
     if (!palReadLine(HAL_GPIO_PIN_VDD_5V_PERIPH_OC)) {
         flags |= MAV_POWER_STATUS_PERIPH_OVERCURRENT;
-    }
+    }    
 #endif
-    if (_power_flags != 0 &&
-        _power_flags != flags &&
+    if (_power_flags != 0 && 
+        _power_flags != flags && 
         hal.util->get_soft_armed()) {
         // the power status has changed while armed
         flags |= MAV_POWER_STATUS_CHANGED;
@@ -413,3 +406,4 @@ void AnalogIn::update_power_flags(void)
     _power_flags = flags;
 }
 #endif // HAL_USE_ADC
+

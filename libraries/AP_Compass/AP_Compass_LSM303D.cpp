@@ -282,7 +282,9 @@ bool AP_Compass_LSM303D::init(enum Rotation rotation)
 
 bool AP_Compass_LSM303D::_hardware_init()
 {
-    _dev->get_semaphore()->take_blocking();
+    if (!_dev->get_semaphore()->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
+        AP_HAL::panic("LSM303D: Unable to get semaphore");
+    }
 
     // initially run the bus at low speed
     _dev->set_speed(AP_HAL::Device::SPEED_LOW);

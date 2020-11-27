@@ -10,10 +10,10 @@ class AP_Proximity_TeraRangerTower : public AP_Proximity_Backend
 
 public:
     // constructor
-    AP_Proximity_TeraRangerTower(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state);
+    AP_Proximity_TeraRangerTower(AP_Proximity &_frontend, AP_Proximity::Proximity_State &_state, AP_SerialManager &serial_manager);
 
     // static detection function
-    static bool detect();
+    static bool detect(AP_SerialManager &serial_manager);
 
     // update state
     void update(void) override;

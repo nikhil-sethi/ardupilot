@@ -6,9 +6,7 @@
  */
 #pragma once
 
-#include <AP_Filesystem/AP_Filesystem.h>
-
-#if HAVE_FILESYSTEM_SUPPORT
+#if HAL_OS_POSIX_IO || HAL_OS_FATFS_IO
 
 #include <AP_HAL/utility/RingBuffer.h>
 #include "AP_Logger_Backend.h"
@@ -42,7 +40,7 @@ public:
     void get_log_info(uint16_t log_num, uint32_t &size, uint32_t &time_utc) override;
     int16_t get_log_data(uint16_t log_num, uint16_t page, uint32_t offset, uint16_t len, uint8_t *data) override;
     uint16_t get_num_logs() override;
-    void start_new_log(void) override;
+    uint16_t start_new_log(void) override;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL || CONFIG_HAL_BOARD == HAL_BOARD_LINUX
     void flush(void) override;
@@ -69,9 +67,6 @@ private:
     int _write_fd;
     char *_write_filename;
     uint32_t _last_write_ms;
-#if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
-    bool _need_rtc_update;
-#endif
     
     int _read_fd;
     uint16_t _read_fd_log_num;
@@ -79,16 +74,12 @@ private:
     uint32_t _write_offset;
     volatile bool _open_error;
     const char *_log_directory;
-    bool _last_write_failed;
 
     uint32_t _io_timer_heartbeat;
     bool io_thread_alive() const;
     uint8_t io_thread_warning_decimation_counter;
 
     uint16_t _cached_oldest_log;
-
-    // should we rotate when we next stop logging
-    bool _rotate_pending;
 
     uint16_t _log_num_from_list_entry(const uint16_t list_entry);
 
@@ -185,5 +176,4 @@ private:
 
 };
 
-#endif // HAVE_FILESYSTEM_SUPPORT
-
+#endif // HAL_OS_POSIX_IO

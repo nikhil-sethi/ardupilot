@@ -9,7 +9,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
 #include <GCS_MAVLink/GCS.h>
-#include <AP_Baro/AP_Baro.h>
 
 #include "AP_Airspeed.h"
 
@@ -114,7 +113,6 @@ float Airspeed_Calibration::update(float airspeed, const Vector3f &vg, int16_t m
  */
 void AP_Airspeed::update_calibration(uint8_t i, const Vector3f &vground, int16_t max_airspeed_allowed_during_cal)
 {
-#if AP_AIRSPEED_AUTOCAL_ENABLE
     if (!param[i].autocal) {
         // auto-calibration not enabled
         return;
@@ -150,7 +148,6 @@ void AP_Airspeed::update_calibration(uint8_t i, const Vector3f &vground, int16_t
     } else {
         state[i].counter++;
     }
-#endif // AP_AIRSPEED_AUTOCAL_ENABLE
 }
 
 /*
@@ -167,22 +164,27 @@ void AP_Airspeed::update_calibration(const Vector3f &vground, int16_t max_airspe
 
 void AP_Airspeed::send_airspeed_calibration(const Vector3f &vground)
 {
-#if AP_AIRSPEED_AUTOCAL_ENABLE
-    const mavlink_airspeed_autocal_t packet{
-        vx: vground.x,
-        vy: vground.y,
-        vz: vground.z,
-        diff_pressure: get_differential_pressure(primary),
-        EAS2TAS: AP::baro().get_EAS2TAS(),
-        ratio: param[primary].ratio.get(),
-        state_x: state[primary].calibration.state.x,
-        state_y: state[primary].calibration.state.y,
-        state_z: state[primary].calibration.state.z,
-        Pax: state[primary].calibration.P.a.x,
-        Pby: state[primary].calibration.P.b.y,
-        Pcz: state[primary].calibration.P.c.z
-    };
-    gcs().send_to_active_channels(MAVLINK_MSG_ID_AIRSPEED_AUTOCAL,
-                                  (const char *)&packet);
-#endif // AP_AIRSPEED_AUTOCAL_ENABLE
+    for (uint8_t i=0; i<gcs().num_gcs(); i++) {
+        if (!gcs().chan(i).initialised) {
+            continue;
+        }
+        const mavlink_channel_t chan = (mavlink_channel_t)i;
+        if (!HAVE_PAYLOAD_SPACE(chan, AIRSPEED_AUTOCAL)) {
+            continue;
+        }
+        mavlink_msg_airspeed_autocal_send(
+            chan,
+            vground.x,
+            vground.y,
+            vground.z,
+            get_differential_pressure(primary),
+            AP::baro().get_EAS2TAS(),
+            param[primary].ratio.get(),
+            state[primary].calibration.state.x,
+            state[primary].calibration.state.y,
+            state[primary].calibration.state.z,
+            state[primary].calibration.P.a.x,
+            state[primary].calibration.P.b.y,
+            state[primary].calibration.P.c.z);
+    }
 }
